@@ -208,11 +208,10 @@ bool HotTub::isDisplayInverted()
 }
 
 // Master sends one byte stating which data it wants to get back
-// Defined as a static function in header file
-// the _i2cCmd value tells us what data to send back to the master in 
+// This function is defined as a static function
 void HotTub::i2cReceiveCmd(int bytesReceived)
 {
-  // If received just one byte, this it's a command for data to send back
+  // If received just one byte, then it's a command for data to send back
   if (bytesReceived == 1)
   {
     _i2cCmd = Wire.read();  // read and save the command from Master in i2cSendData()

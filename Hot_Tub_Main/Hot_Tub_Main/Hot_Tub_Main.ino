@@ -1,6 +1,5 @@
 /*
 Do you really need heater_cooldown_timer
-Spikes form heater contacter are messing up LCD display
 When hot tub is about to come on because it needs to heat up, pumpp comes on then goes off after a second, it will do this several times
 Buttons don't latch very well, then need to be tuned
 Get encoder code from tardis alarm, this one doesn't work well
@@ -19,12 +18,27 @@ cd Dropbox/Arduino/Hot_Tub_Controller
 #include "Arduino.h"
 #include <OneWire.h>    // http://www.pjrc.com/teensy/td_libs_OneWire.html  http://playground.arduino.cc/Learning/OneWire
 #include <DallasTemperature.h> // http://milesburton.com/index.php?title=Dallas_Temperature_Control_Library
+#include "I2C.h"  // use for I2C communication  http://dsscircuits.com/articles/arduino-i2c-master-library.html
 
 
 // Include application, user and local libraries
 #include "LocalLibrary.h"
 
 #define ONE_WIRE_BUS 29 // OneWire data pin
+#define SLAVE_ID     46 // I2C address of LED backpack
+#define I2C_SUCCESS   0 // When I2C read/writes are sucessful, function returns 0
+#define MAX_I2C_BYTES 6 // Max I2C bytes to send data to backpack
+
+// I2C Commands to read data from LED backpack
+enum {
+  CMD_SLAVE_ID   = 1,
+  CMD_ONOFF_BTN  = 2,
+  CMD_PUMP_BTN   = 3,
+  CMD_BUBBLE_BTN = 4,
+  CMD_TEMP_SETPT = 5
+};
+
+
 
 //=== Analog Inputs for CTs measuring current ===
 #define CT_PUMP        8  // Pump amps input 20 Amp CT
@@ -40,9 +54,7 @@ cd Dropbox/Arduino/Hot_Tub_Controller
 #define HEATER_ON_OFF_OUTPUT_PIN        9
 #define BUBBLER_ON_OFF_OUTPUT_PIN       8
 
-#define WATER_TEMP_DEFAULT  82
-int Temperature_Setpoint = WATER_TEMP_DEFAULT;  //srg this is in both sketches
-
+int Temperature_Setpoint = 100;  // Initial setpoint
 
 
 // Initialize OneWire temp sensors
@@ -99,7 +111,7 @@ void CheckAlarms();
 void OutputAlarm(char AlarmText[]);
 void PrintStatus();
 boolean NeedHeat();
-void WDTSetup(void);
+
 
 
 //============================================================================
@@ -107,27 +119,18 @@ void setup()
 {
   Serial.begin(9600);
   
-  //  WDTSetup();  // Initialize WDT timer
+  oneWireBus.begin(); // Initialize OneWire
 
-  // Initialize Digital I/O
-  pinMode(PUMP_ON_OFF_OUTPUT_PIN,       OUTPUT);
-  pinMode(HEATER_ON_OFF_OUTPUT_PIN,     OUTPUT);
-  pinMode(BUBBLER_ON_OFF_OUTPUT_PIN,    OUTPUT);
-  
-    oneWireBus.begin(); // Initialize OneWire  
-  
-    // Initialize input buttons arrays
-  for(int btn=0; btn < 3; btn++)
-  {
-    InputButtonsCurrentState[btn] = LOW;
-  }
-  
+  I2c.begin();  // Initialize I2C
+  I2c.pullup(0); // turn off internal pullups
+  I2c.timeOut(30000); // 30 second timeout
+
   
   // Initialize timers
   heater_cooldown_timer = 0;
   last_heater_on_check =  0;
   
-  Serial.println("Finished setup()");
+  Serial.println(F("Finished Hot Tub setup()"));
   
 } // setup()
 
@@ -138,24 +141,45 @@ void loop()
 {
   
   static uint32_t lastPumpOnTime; // Millis() Timestamp of when pump was last turned on.  Updates every cycle that pump should be on.  Used to keep pump from cycling on/off too fast
- 
+
+  // Read pushbutton status and temperature setpoint from LED backpack
+  if( I2c.write(SLAVE_ID, CMD_ONOFF_BTN) == I2C_SUCCESS )  // Set pointer to On/Off button status
+  {
+    I2c.read(SLAVE_ID, 1);               // request on/off button status
+    InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] = I2c.receive();      // Read the on/off button status
+  }
+  else
+  { Serial.println(F("I2C Write Failed - on/off btn")); }
+    
   
-    // Check sensor inputs
+  I2c.write(SLAVE_ID, CMD_PUMP_BTN);  
+  I2c.read(SLAVE_ID, 1);               
+  InputButtonsCurrentState[BTN_JETS_ON_OFF] = I2c.receive();      
+
+  I2c.write(SLAVE_ID, CMD_BUBBLE_BTN);  
+  I2c.read(SLAVE_ID, 1);               
+  InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] = I2c.receive();
+
+  I2c.write(SLAVE_ID, CMD_TEMP_SETPT);
+  I2c.read(SLAVE_ID, 1);
+  Temperature_Setpoint = I2c.receive();
+
+  
+  // Check sensor inputs
   if ((long)(millis() - last_sensor_check) > SENSOR_CHECK_INTERVAL)
   {
     last_sensor_check = millis();
     ReadSensorInputs();
   }
   
-    // Check alarms
+  // Check alarms
   if ((long)(millis() - last_alarm_check) > ALARM_CHECK_INTERVAL)
   {
     last_alarm_check = millis();
     CheckAlarms();
   }
-  
-  
-  PrintStatus();  //Print for debugging
+
+  PrintStatus();  // Print for debugging
   
 
   // Turn off pump         srg - pump sometimes turns off right after turning on
@@ -165,7 +189,7 @@ void loop()
      (InputButtonsCurrentState[BTN_JETS_ON_OFF] == LOW && NeedHeat() == false && (long)(millis() - heater_cooldown_timer) > 0) )
   {
     // srg debug
-     // Print values so you can see why pump is turned off
+    // Print values so you can see why pump is turned off
     if(digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == HIGH)
     {
      Serial.println("Turning Pump Off");
@@ -197,7 +221,7 @@ void loop()
      ((long)(millis() - lastPumpOnTime) > PUMP_ON_DELAY))                           // Delay before pump can be turned on again after being off, prevents fast cycling if there is a problem
   {
     // srg debug
-     // Print values so you can see why pump is turned off
+    // Print values so you can see why pump is turned off
     if(digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == LOW)
     {
      Serial.println("Turning Pump On");
@@ -270,33 +294,25 @@ void loop()
     digitalWrite(BUBBLER_ON_OFF_OUTPUT_PIN, LOW);
     InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] = LOW;
   }
-  
-  
-  
-  
 
+  // Send data to LED Backpack
+  uint8_t i2cBuf[MAX_I2C_BYTES];
+  i2cBuf[0] = 0; // First byte is zero, this tells backpack that Master is sending status data
+  i2cBuf[1] = InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF];
+  i2cBuf[2] = InputButtonsCurrentState[BTN_BUBBLER_ON_OFF];
+  i2cBuf[3] = InputButtonsCurrentState[BTN_JETS_ON_OFF];
+  i2cBuf[4] = digitalRead(HEATER_ON_OFF_OUTPUT_PIN);
+  i2cBuf[5] = (byte) tempTC[PRE_HEATER];
+  I2c.write(SLAVE_ID, 0, i2cBuf, MAX_I2C_BYTES);  // send data to backpack   SRG - 0 is register address, not sure if I'm doing this right
+  
 }  // loop()
 
 
 
-
 //*********************************************************************************
-/*
- 8888888b.                        888  .d8888b.                                            8888888                            888
- 888   Y88b                       888 d88P  Y88b                                             888                              888
- 888    888                       888 Y88b.                                                  888                              888
- 888   d88P .d88b.   8888b.   .d88888  "Y888b.    .d88b.  88888b.  .d8888b   .d88b.  888d888 888   88888b.  88888b.  888  888 888888 .d8888b
- 8888888P" d8P  Y8b     "88b d88" 888     "Y88b. d8P  Y8b 888 "88b 88K      d88""88b 888P"   888   888 "88b 888 "88b 888  888 888    88K
- 888 T88b  88888888 .d888888 888  888       "888 88888888 888  888 "Y8888b. 888  888 888     888   888  888 888  888 888  888 888    "Y8888b.
- 888  T88b Y8b.     888  888 Y88b 888 Y88b  d88P Y8b.     888  888      X88 Y88..88P 888     888   888  888 888 d88P Y88b 888 Y88b.       X88
- 888   T88b "Y8888  "Y888888  "Y88888  "Y8888P"   "Y8888  888  888  88888P'  "Y88P"  888   8888888 888  888 88888P"   "Y88888  "Y888  88888P'
-.                                                                                                           888
-.                                                                                                           888
-.                                                                                                           888
- */
-  // Read Amps, Temperatures and pressure
-  // Take 25 samples then take average
-  //*********************************************************************************
+// Read Amps, Temperatures and pressure
+// Take 25 samples then take average
+//*********************************************************************************
 void ReadSensorInputs()
 {
   // Get temperatures from Thermocouples
@@ -324,7 +340,7 @@ void ReadSensorInputs()
 
   if(abs(PreHeaterTemp1 - PreHeaterTemp2) < 4)
   {
-      // Two probes are relatively close, just take the average for the temp
+    // Two probes are relatively close, just take the average for the temp
     tempTC[PRE_HEATER] =  (PreHeaterTemp1 + PreHeaterTemp2) / 2;
   }
   else if(PreHeaterTemp1 > PreHeaterTemp2)    // Temp probes are not very close, choose higher one so heater doesn't stay on all the time
@@ -333,17 +349,17 @@ void ReadSensorInputs()
   { tempTC[PRE_HEATER] = PreHeaterTemp2; }
   
   
-    // Take multiple samples and get average
-    // Initialize variables
-  pump_amps =            0.0;
-  heater_amps =          0.0;
-  bubbler_amps =         0.0;
-  pressure =             0.0;
+  // Take multiple samples and get average
+  // Initialize variables
+  pump_amps =    0.0;
+  heater_amps =  0.0;
+  bubbler_amps = 0.0;
+  pressure =     0.0;
   int samples;
   
   for (samples = 0; samples < 25; samples++)
   {
-      // Get Amps from CTs
+    // Get Amps from CTs
     pump_amps    += analogRead(CT_PUMP);  // ADC value for pump is about 630
     heater_amps  += (analogRead(CT_HEATER1) + analogRead(CT_HEATER2))/2.0;  // There are 2 CTs for the heater, take average.  Each one should read about 22.8 amps
     bubbler_amps += analogRead(CT_BUBBLER);
@@ -351,7 +367,7 @@ void ReadSensorInputs()
     delay(1);
   }
   
-    // Calculate averages from samples
+  // Calculate averages from samples
   pump_amps =    (pump_amps    / (float) samples) * (20.0 / 1024.0) - 1.3;    // 20 Amp CT, -1.3 calibration offset
   heater_amps =  (heater_amps  / (float) samples) * (50.0 / 1024.0) - 4.75;    // 50 Amp CTs, -4.75 amps calibration offset
   bubbler_amps = (bubbler_amps / (float) samples) * (20.0 / 1024.0) - 1.0;    // 20 Amp CTs, -1.0 amp calibration offset
@@ -390,17 +406,8 @@ boolean NeedHeat()
 
 
 
-  //*********************************************************************************
+//*********************************************************************************
 /*
- .d8888b.  888                        888             d8888 888
- d88P  Y88b 888                        888            d88888 888
- 888    888 888                        888           d88P888 888
- 888        88888b.   .d88b.   .d8888b 888  888     d88P 888 888  8888b.  888d888 88888b.d88b.  .d8888b
- 888        888 "88b d8P  Y8b d88P"    888 .88P    d88P  888 888     "88b 888P"   888 "888 "88b 88K
- 888    888 888  888 88888888 888      888888K    d88P   888 888 .d888888 888     888  888  888 "Y8888b.
- Y88b  d88P 888  888 Y8b.     Y88b.    888 "88b  d8888888888 888 888  888 888     888  888  888      X88
- "Y8888P"  888  888  "Y8888   "Y8888P 888  888 d88P     888 888 "Y888888 888     888  888  888  88888P'
- 
  Check for alarms
  High Water Temp
  Low Water Temp
@@ -411,8 +418,8 @@ boolean NeedHeat()
  High Heater Amps
  Low Heater Amps
  Differnet heater amps from Ph 1 to Ph 2
- */
-  //*********************************************************************************
+*/
+//*********************************************************************************
 void CheckAlarms()
 {
   char txtAlarm[75];
@@ -485,20 +492,7 @@ void CheckAlarms()
 
 
 //*********************************************************************************
-/*
- .d88888b.           888                      888           d8888 888
- d88P" "Y88b          888                      888          d88888 888
- 888     888          888                      888         d88P888 888
- 888     888 888  888 888888 88888b.  888  888 888888     d88P 888 888  8888b.  888d888 88888b.d88b.
- 888     888 888  888 888    888 "88b 888  888 888       d88P  888 888     "88b 888P"   888 "888 "88b
- 888     888 888  888 888    888  888 888  888 888      d88P   888 888 .d888888 888     888  888  888
- Y88b. .d88P Y88b 888 Y88b.  888 d88P Y88b 888 Y88b.   d8888888888 888 888  888 888     888  888  888
- "Y88888P"   "Y88888  "Y888 88888P"   "Y88888  "Y888 d88P     888 888 "Y888888 888     888  888  888
-.                            888
-.                            888
-.                            888
- 
- Print Alarm Text   */
+// Print Alarm Text  
 //*********************************************************************************
 void OutputAlarm(char AlarmText[])
 {
@@ -510,16 +504,6 @@ void OutputAlarm(char AlarmText[])
 
 
 //*********************************************************************************
-/*
- 8888888b.          d8b          888    .d8888b.  888             888
- 888   Y88b         Y8P          888   d88P  Y88b 888             888
- 888    888                      888   Y88b.      888             888
- 888   d88P 888d888 888 88888b.  888888 "Y888b.   888888  8888b.  888888 888  888 .d8888b
- 8888888P"  888P"   888 888 "88b 888       "Y88b. 888        "88b 888    888  888 88K
- 888        888     888 888  888 888         "888 888    .d888888 888    888  888 "Y8888b.
- 888        888     888 888  888 Y88b. Y88b  d88P Y88b.  888  888 Y88b.  Y88b 888      X88
- 888        888     888 888  888  "Y888 "Y8888P"   "Y888 "Y888888  "Y888  "Y88888  88888P'
- */
 //*********************************************************************************
 void PrintStatus()
 {

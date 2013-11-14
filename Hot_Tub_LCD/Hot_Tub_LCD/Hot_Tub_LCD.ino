@@ -169,9 +169,6 @@ void setup()
 
 void loop()
 {
-
-  
-  
   hottub.processButtons();   // Read button state and update on/off status of Hot tub, pump, bubbler lights inside the pushbuttons
   
   // Update pushbuttonbutton LEDs
