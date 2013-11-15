@@ -78,7 +78,7 @@ From Main board to backback
 #define BUBBLER_INDICATOR_OUTPUT_PIN  A1 
 
 //=== Pushbutton Inputs ===
-#define HOT_TUB_BUTTON_INPUT_PIN     A6  
+#define HOT_TUB_BUTTON_INPUT_PIN     A6  // Note: A6 & A7 on pro-mini can't be used as digital Input
 #define JETS_BUTTON_INPUT_PIN        A7  
 #define BUBBLER_BUTTON_INPUT_PIN     A2  
 
@@ -89,11 +89,11 @@ From Main board to backback
 
 
 // LCD I/O
-#define LCD_SID  8
-#define LCD_SCLK 7
-#define LCD_A0   6
-#define LCD_RST  5
-#define LCD_CS   4
+#define LCD_SID         4
+#define LCD_SCLK        5
+#define LCD_A0          6
+#define LCD_RST         7
+#define LCD_CS          8
 #define BACKLIGHT_RED   9 // sets LCD backlight color
 #define BACKLIGHT_GRN  10
 #define BACKLIGHT_BLU  11
@@ -130,7 +130,7 @@ HotTub hottub;
 // Define Function Prototypes
 void ReadInputButtons();
 void EncoderSetup();
-bool getTempSetpoint();
+bool refreshTempSetpoint();
 void UpdateDisplay(uint8_t temperature, char statusMsg[] );
 void doEncoderA();
 void doEncoderB();
@@ -139,6 +139,9 @@ void doEncoderB();
 
 void setup()
 {
+  
+  Serial.begin(9600);
+  
   // Define I/O pins.  Some I/O is defined in libraries
   pinMode(ON_OFF_INDICATOR_OUTPUT_PIN,  OUTPUT);
   pinMode(PUMP_INDICATOR_OUTPUT_PIN,    OUTPUT);
@@ -176,8 +179,8 @@ void loop()
   digitalWrite( PUMP_INDICATOR_OUTPUT_PIN,    hottub.isPumpOn() );
   digitalWrite( BUBBLER_INDICATOR_OUTPUT_PIN, hottub.isBubblerOn() );
   
-  // See if there is a new setpoint temperature from encoder.  Returns true if there is a new temperature
-  bool isNewTempSetpoint = getTempSetpoint();
+  // See if there is a new setpoint temperature from encoder.  Returns true if there is a new temperature setpoint
+  bool isNewTempSetpoint = refreshTempSetpoint();
 
   // update LCD display
   // UpdateDisplay() will check to see if anything has changed before it sends new data to the display
@@ -351,10 +354,11 @@ void EncoderSetup()
 
 //*********************************************************************************
 //  Refresh the temperature setupoint from encoder
+//  Returns true if there is a new temperature
 //*********************************************************************************
-bool getTempSetpoint()
+bool refreshTempSetpoint()
 {
-  static uint32_t newSetpointDisplayDelay;
+  static uint32_t newSetpointDisplayDelay;  // keeps setpoint temp displayed for a couple seconds
   bool isNewTempSetpoint;
 
   rotating = true;  // reset the debouncer
@@ -386,15 +390,20 @@ bool getTempSetpoint()
 
     hottub.setWaterTemp(encoderTemp); // Save new water temp setpoint
   }
-  else if(millis() >= newSetpointDisplayDelay + 2000)
-  // after a 2 second delay, reset isNewTempSetpoint flag  - srg not sure why I needed this
-  {
-    isNewTempSetpoint = false; // Used by LCD display
-  }
-  
+  else
+ { 
+    // after a 2 second delay, reset isNewTempSetpoint flag  
+    // this is used so display doesn't revert back to showing actual temperature while user is 
+    // rotating encoder 
+    if(millis() >= newSetpointDisplayDelay + 2000)
+    { isNewTempSetpoint = false; }
+    else
+    { isNewTempSetpoint = true; }
+ }
+ 
   return isNewTempSetpoint;
   
-} // getTempSetpoint()
+} // refreshTempSetpoint()
 
 //*********************************************************************************
 // Interrupt on A changing state

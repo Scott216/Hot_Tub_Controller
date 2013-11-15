@@ -1,4 +1,4 @@
-/*
+      /*
 Do you really need heater_cooldown_timer
 When hot tub is about to come on because it needs to heat up, pumpp comes on then goes off after a second, it will do this several times
 Buttons don't latch very well, then need to be tuned
@@ -42,9 +42,9 @@ enum {
 
 //=== Analog Inputs for CTs measuring current ===
 #define CT_PUMP        8  // Pump amps input 20 Amp CT
-#define CT_HEATER1    11  // Heater leg 1 amps, 50 Amp CT
+#define CT_HEATER1     9  // Heater leg 1 amps, 50 Amp CT
 #define CT_HEATER2    10  // Heater leg 2 amps, 50 Amp CT
-#define CT_BUBBLER     9  // Bubbler amps, 20 Amp CT
+#define CT_BUBBLER    11  // Bubbler amps, 20 Amp CT
 
 //===Analog Inputs from Pressure===
 #define PRESSURE_GAUGE 12  // Pressure, comes from 4-20mA gauge

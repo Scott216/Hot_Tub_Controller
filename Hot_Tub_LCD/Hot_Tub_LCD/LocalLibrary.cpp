@@ -26,8 +26,7 @@ HotTub::~HotTub()
 
 void HotTub::begin()
 {
-  pinMode(HOT_TUB_BUTTON_INPUT_PIN, INPUT);   // PCB has pullup resistors, don't need internal ones
-  pinMode(JETS_BUTTON_INPUT_PIN,    INPUT);
+  // Note: HOT_TUB_BUTTON_INPUT_PIN and JETS_BUTTON_INPUT_PIN are on pins A6 & A6 which can't be configured as digital
   pinMode(BUBBLER_BUTTON_INPUT_PIN, INPUT);
   pinMode(ENCODERPB,                INPUT);
 
@@ -49,7 +48,7 @@ bool HotTub::processButtons()
   { return false; } // Haven't waited past debounce delay. Just exit
 
   // Check On/Off button.  If hot tub is on, turn it off and visa-versa
-  if( digitalRead(HOT_TUB_BUTTON_INPUT_PIN) == BTN_ON )
+  if( analogRead(HOT_TUB_BUTTON_INPUT_PIN) < 100 )
   {
     _debounceTimout = millis() + debounceDelay;
     if (isHotTubOn())
@@ -66,7 +65,7 @@ bool HotTub::processButtons()
   }
 
   // Check Pump button
-  if( digitalRead(JETS_BUTTON_INPUT_PIN) == BTN_ON )
+  if( analogRead(JETS_BUTTON_INPUT_PIN)< 100 )
   {
     _debounceTimout = millis() + debounceDelay;
     if (isPumpOn())
