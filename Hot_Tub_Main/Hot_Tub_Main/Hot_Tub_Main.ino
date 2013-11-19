@@ -25,11 +25,11 @@ cd Dropbox/Arduino/Hot_Tub_Controller
 #include "LocalLibrary.h"
 
 #define ONE_WIRE_BUS 29 // OneWire data pin
-#define SLAVE_ID     46 // I2C address of LED backpack
+#define SLAVE_ID     46 // I2C address of LED backpack on user panel
 #define I2C_SUCCESS   0 // When I2C read/writes are sucessful, function returns 0
-#define MAX_I2C_BYTES 6 // Max I2C bytes to send data to backpack
+#define MAX_I2C_BYTES 6 // Max I2C bytes to send data to slave
 
-// I2C Commands to read data from LED backpack
+// I2C Commands to read data from LED backpack user panel
 enum {
   CMD_SLAVE_ID   = 1,
   CMD_ONOFF_BTN  = 2,
@@ -122,7 +122,7 @@ void setup()
   oneWireBus.begin(); // Initialize OneWire
 
   I2c.begin();  // Initialize I2C
-  I2c.pullup(0); // turn off internal pullups
+  I2c.pullup(0); // turn off internal pullups (doesn't do anything on mega)
   I2c.timeOut(30000); // 30 second timeout
 
   
@@ -139,19 +139,40 @@ void setup()
 //============================================================================
 void loop()
 {
-  
+
+delay(200); // srg debug
+
   static uint32_t lastPumpOnTime; // Millis() Timestamp of when pump was last turned on.  Updates every cycle that pump should be on.  Used to keep pump from cycling on/off too fast
 
-  // Read pushbutton status and temperature setpoint from LED backpack
-  if( I2c.write(SLAVE_ID, CMD_ONOFF_BTN) == I2C_SUCCESS )  // Set pointer to On/Off button status
+
+I2c.write (SLAVE_ID, CMD_SLAVE_ID);
+delay(1);
+I2c.read(SLAVE_ID, 1);
+int val = I2c.receive();
+Serial.print ("Value of A: ");
+Serial.println (val, DEC);
+delay(100);
+
+
+  // Read pushbuttons status and temperature setpoint from user panel
+  int status = I2c.write(SLAVE_ID, CMD_ONOFF_BTN);
+  if( status == I2C_SUCCESS )            // Set pointer to On/Off button status
   {
-    I2c.read(SLAVE_ID, 1);               // request on/off button status
-    InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] = I2c.receive();      // Read the on/off button status
+    I2c.read(SLAVE_ID, 1);                                           // request on/off button status
+    InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] = I2c.receive();    // Read the on/off button status
   }
   else
-  { Serial.println(F("I2C Write Failed - on/off btn")); }
-    
-  
+  {
+    Serial.print(F("I2C Write Failed - on/off btn.  Status = "));
+    Serial.print(status, HEX);
+    Serial.print("  ");
+    status = I2c.read(SLAVE_ID, 1);
+    Serial.print(status, HEX );
+    Serial.print("  ");
+    Serial.println( I2c.receive());
+
+  }
+
   I2c.write(SLAVE_ID, CMD_PUMP_BTN);  
   I2c.read(SLAVE_ID, 1);               
   InputButtonsCurrentState[BTN_JETS_ON_OFF] = I2c.receive();      
@@ -164,6 +185,13 @@ void loop()
   I2c.read(SLAVE_ID, 1);
   Temperature_Setpoint = I2c.receive();
 
+  Serial.print(InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF]);
+  Serial.print("  ");
+  Serial.print(InputButtonsCurrentState[CMD_BUBBLE_BTN]);
+  Serial.print("  ");
+  Serial.print(InputButtonsCurrentState[BTN_JETS_ON_OFF]);
+  Serial.print("  ");
+  Serial.println(Temperature_Setpoint);
   
   // Check sensor inputs
   if ((long)(millis() - last_sensor_check) > SENSOR_CHECK_INTERVAL)
@@ -179,7 +207,7 @@ void loop()
     CheckAlarms();
   }
 
-  PrintStatus();  // Print for debugging
+//  PrintStatus();  // Print for debugging
   
 
   // Turn off pump         srg - pump sometimes turns off right after turning on
@@ -295,15 +323,15 @@ void loop()
     InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] = LOW;
   }
 
-  // Send data to LED Backpack
+  // Send data to User Panel
   uint8_t i2cBuf[MAX_I2C_BYTES];
-  i2cBuf[0] = 0; // First byte is zero, this tells backpack that Master is sending status data
+  i2cBuf[0] = 0; // First byte is zero, this tells slave that Master is sending status data
   i2cBuf[1] = InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF];
   i2cBuf[2] = InputButtonsCurrentState[BTN_BUBBLER_ON_OFF];
   i2cBuf[3] = InputButtonsCurrentState[BTN_JETS_ON_OFF];
   i2cBuf[4] = digitalRead(HEATER_ON_OFF_OUTPUT_PIN);
   i2cBuf[5] = (byte) tempTC[PRE_HEATER];
-  I2c.write(SLAVE_ID, 0, i2cBuf, MAX_I2C_BYTES);  // send data to backpack   SRG - 0 is register address, not sure if I'm doing this right
+  I2c.write(SLAVE_ID, 0, i2cBuf, MAX_I2C_BYTES);  // send data to user panel   SRG - 0 is register address, not sure if I'm doing this right
   
 }  // loop()
 
@@ -369,14 +397,26 @@ void ReadSensorInputs()
   
   // Calculate averages from samples
   pump_amps =    (pump_amps    / (float) samples) * (20.0 / 1024.0) - 1.3;    // 20 Amp CT, -1.3 calibration offset
-  heater_amps =  (heater_amps  / (float) samples) * (50.0 / 1024.0) - 4.75;    // 50 Amp CTs, -4.75 amps calibration offset
+  heater_amps =  (heater_amps  / (float) samples) * (50.0 / 1024.0) - 4.75;   // 50 Amp CTs, -4.75 amps calibration offset
   bubbler_amps = (bubbler_amps / (float) samples) * (20.0 / 1024.0) - 1.0;    // 20 Amp CTs, -1.0 amp calibration offset
-  pressure =     (pressure     / (float) samples) * 0.0377 - 7.5094 + 0.25;   //  0.25 PSI calibration offset
-  if (pump_amps    < 1.0) pump_amps = 0.0;
-  if (heater_amps  < 1.0) heater_amps = 0.0;
+  pressure =     (pressure     / (float) samples) * 0.0377 - 7.5094 + 0.25;   // 0.25 PSI calibration offset
+  // If values are close to zero, then set to zero
+  if (pump_amps    < 1.0) pump_amps =    0.0;
+  if (heater_amps  < 1.0) heater_amps =  0.0;
   if (bubbler_amps < 0.5) bubbler_amps = 0.0;
-  if (pressure     < 2.0) pressure = 0.0;
-  
+  if (pressure     < 2.0) pressure =     0.0;
+
+
+  // SRG dummy data when not connected
+  tempTC[POST_HEATER] = 110;
+  tempTC[PUMP_HOUSING] = 150;
+  tempTC[PRE_HEATER] = 98;
+  pump_amps = 9.0;
+  heater_amps = 22.0;
+  bubbler_amps = 5.0;
+  pressure = 15.0;
+
+
 }  // ReadSensorInputs()
 
 
@@ -427,63 +467,63 @@ void CheckAlarms()
   // High water temp, pre-heater
   if ( tempTC[PRE_HEATER] > 120 )
   {
-    sprintf(txtAlarm, "High Pre-heater temperature = %d degrees", (int) tempTC[PRE_HEATER]);
+    sprintf_P(txtAlarm, PSTR("High pre-heater temperature = %d degrees"), (int) tempTC[PRE_HEATER] );
     OutputAlarm(txtAlarm);
   }
   
   // high water temp, post heater
   if (  tempTC[POST_HEATER] > 150 )
   {
-    sprintf(txtAlarm, "High Post-heater temperatur = %d degrees", (int) tempTC[POST_HEATER]);
+    sprintf_P(txtAlarm, PSTR("High post-heater temperature = %d degrees"), (int) tempTC[POST_HEATER] );
     OutputAlarm(txtAlarm);
   }
   
   // Pump housing high temperature
   if ( tempTC[PUMP_HOUSING] > 150 )
   {
-    sprintf(txtAlarm, "High pump housing temperature = %d degrees", (int) tempTC[PUMP_HOUSING]);
+    sprintf_P(txtAlarm, PSTR("High pump housing temperature = %d degrees"), (int) tempTC[PUMP_HOUSING] );
     OutputAlarm(txtAlarm);
   }
   
   // Low temp alarm
   if ( tempTC[PRE_HEATER] < 50 )
   {
-    sprintf(txtAlarm, "Low Pre-heater temperature = %d degrees", (int) tempTC[PRE_HEATER]);
+    sprintf_P(txtAlarm, PSTR("Low pre-heater temperature = %d degrees"), (int) tempTC[PRE_HEATER] );
     OutputAlarm(txtAlarm);
   }
   
   // High pressure alarm
   if ( pressure > 20.0 )
   {
-    sprintf(txtAlarm, "High Pressure Alarm, pressure = %d PSI", (int) pressure);
+    sprintf_P(txtAlarm, PSTR("High pressure alarm, pressure = %d PSI"), (int) pressure );
     OutputAlarm(txtAlarm);
   }
   
   // High Pump Amps alarm
   if ( pump_amps > 18.0 )
   {
-    sprintf(txtAlarm, "High Pump Amps Alarm = %d amps", (int) pump_amps);
+    sprintf_P(txtAlarm, PSTR("High pump amps alarm = %d amps"), (int) pump_amps );
     OutputAlarm(txtAlarm);
   }
   
   // Pump on but pressure is low.  Will need delay after pump is first turned on before you check for alarm
   if ( (pressure < 5.0) && (digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == HIGH) )
   {
-    sprintf(txtAlarm, "Low Pressure Alarm while pump is on, pressure = %d PSI", (int) pressure);
+    sprintf_P(txtAlarm, PSTR("Low pressure alarm while pump is on, pressure = %d PSI"), (int) pressure );
     OutputAlarm(txtAlarm);
   }
   
   // High heater amps
   if ( heater_amps > ALARM_HEATER_AMPS_HIGH )
   {
-    sprintf(txtAlarm, "High heater amps = %d", (int) heater_amps);
+    sprintf_P(txtAlarm, PSTR("High heater amps = %d"), (int) heater_amps );
     OutputAlarm(txtAlarm);
   }
   
   // Low heater amps
   if ( (heater_amps < 15) && (digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == HIGH) )
   {
-    sprintf(txtAlarm, "Low heater amps while heater is on = %d amps.", (int) heater_amps);
+    sprintf_P(txtAlarm, PSTR("Low heater amps while heater is on = %d amps"), (int) heater_amps );
     OutputAlarm(txtAlarm);
   }
   
@@ -600,8 +640,6 @@ void PrintStatus()
      */
     
   }
-  
-  
 } // end PrintStatus()
 
 

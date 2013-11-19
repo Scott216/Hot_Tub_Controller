@@ -2,6 +2,8 @@
 #include "LocalLibrary.h"
 #include <Wire.h>
 
+bool i2crequest;
+bool i2creceive;
 
 // Static variables are like non-inline member functions in that they are declared in a class
 // declaration and defined in the corresponding source file. http://bit.ly/1djyt1S & http://ibm.co/1bxfbVy
@@ -31,10 +33,11 @@ void HotTub::begin()
   pinMode(ENCODERPB,                INPUT);
 
   // Setup I2C handlers
-  Wire.begin (SLAVE_ID);
+//  Wire.begin (SLAVE_ID);
   Wire.onReceive (i2cReceiveCmd);  // interrupt handler for incoming commands
   Wire.onRequest (i2cSendData);    // interrupt handler to send data to the master when the master requests it
 
+  
   // Set water temperature to default
   setWaterTemp( getWaterTempDefault() );
 }
@@ -44,6 +47,24 @@ void HotTub::begin()
 // Returns true if any pushbutton press was detected
 bool HotTub::processButtons()
 {
+  
+  if(i2crequest)  // srg debug
+  {
+    i2crequest = false;
+    digitalWrite(A1, HIGH);
+    delay(30);
+    digitalWrite(A1, LOW);
+  }
+
+  if(i2creceive)
+  {
+    i2creceive = false;
+    digitalWrite(13, HIGH);
+    delay(30);
+    digitalWrite(13, LOW);
+  }
+
+
   if ((long) (millis() - _debounceTimout) < 0 )
   { return false; } // Haven't waited past debounce delay. Just exit
 
@@ -207,21 +228,23 @@ bool HotTub::isDisplayInverted()
 }
 
 // Master sends one byte stating which data it wants to get back
-// This function is defined as a static function
+// This function is defined as a static function in header file
 void HotTub::i2cReceiveCmd(int bytesReceived)
 {
+  i2crequest = true;  // srg debug
+  
   // If received just one byte, then it's a command for data to send back
   if (bytesReceived == 1)
   {
     _i2cCmd = Wire.read();  // read and save the command from Master in i2cSendData()
   }
 
-  // If we received MAX_I2C_BYTES, then Master is sending data for slave to store
+  // If we received MAX_I2C_BYTES, then Master is sending data for slave to store in the slave
   if (bytesReceived == MAX_I2C_BYTES)
   {
-    // Verify 1st byte = 0
+    // Verify 1st byte is save all command
     _i2cCmd = Wire.read(); 
-    if( _i2cCmd == 0 )
+    if( _i2cCmd == CMD_SAVE_ALL )
     {
       // First byte = 0 which means master is sending data to slave, read the remaining bytes
       _isHotTubOn =  Wire.read(); // 2nd byte
@@ -229,10 +252,10 @@ void HotTub::i2cReceiveCmd(int bytesReceived)
       _isPumpOn =    Wire.read(); // 4th byte
       _isHeaterOn =  Wire.read(); // 5th byte
       _tempActual =  Wire.read(); // 6th byte
-
     }
-  }
-}
+  } // if(MAX_I2C_BYTES)
+  
+}  // i2cReceiveCmd()
 
 
 
@@ -241,8 +264,10 @@ void HotTub::i2cReceiveCmd(int bytesReceived)
 // Note: On/Off variables are more of a on/off request to the main controller
 void HotTub::i2cSendData()
 {
+  i2creceive = true; // srg debug
+
   switch(_i2cCmd)
-  {
+ /* {
     case CMD_SLAVE_ID:
       Wire.write(SLAVE_ID); // return slave address
       break;
@@ -259,8 +284,44 @@ void HotTub::i2cSendData()
       Wire.write((byte)_tempSetpoint);  // return temperature setpoint
       break;
     default:
+      Wire.write(-1);  // invalid command
       break;
   }
+ */ // srg debug
+ {
+    case CMD_SLAVE_ID:
+      Wire.write(SLAVE_ID); // return slave address
+      break;
+    case CMD_ONOFF_BTN:
+      Wire.write(_isHotTubOn);  // return isHotTubOn
+      break;
+    case CMD_PUMP_BTN:
+      Wire.write(_isPumpOn);  // return isPumpOn
+      break;
+    case CMD_BUBBLE_BTN:
+      Wire.write(_isBubblerOn);  // return isBubblerOn
+      break;
+    case CMD_TEMP_SETPT:
+      Wire.write(97);  // return temperature setpoint
+      break;
+    default:
+      Wire.write(-1);
+      break;
+  }
+  
+  
   _i2cCmd = 0; // reset I2C command
 
-}
+} // i2cSendData()
+
+
+// SRG - This is only needed because I can't get the I2C function working in this cpp file
+void HotTub::updateFromMaster( bool onOffState, bool bubbleState, bool pumpState, bool heaterState, int actualTemperature )
+{
+  _isHotTubOn =  onOffState;
+  _isBubblerOn = bubbleState;
+  _isPumpOn =    pumpState; 
+  _isHeaterOn =  heaterState;
+  _tempActual = actualTemperature;
+}  // updateFromMaster()
+

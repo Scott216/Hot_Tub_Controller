@@ -72,15 +72,15 @@ From Main board to backback
 // Include application, user and local libraries
 #include "LocalLibrary.h"
 
-//=== Output for Status Lights ===
-#define ON_OFF_INDICATOR_OUTPUT_PIN   13   // Shows if hot tub is on or off
-#define PUMP_INDICATOR_OUTPUT_PIN     A0 
+//=== Output for LEDs in pushbuttons ===
+#define ON_OFF_INDICATOR_OUTPUT_PIN   A0   // Shows if hot tub is on or off
+#define PUMP_INDICATOR_OUTPUT_PIN     13 
 #define BUBBLER_INDICATOR_OUTPUT_PIN  A1 
 
 //=== Pushbutton Inputs ===
-#define HOT_TUB_BUTTON_INPUT_PIN     A6  // Note: A6 & A7 on pro-mini can't be used as digital Input
-#define JETS_BUTTON_INPUT_PIN        A7  
-#define BUBBLER_BUTTON_INPUT_PIN     A2  
+//#define HOT_TUB_BUTTON_INPUT_PIN     A6  // Note: A6 & A7 on pro-mini can't be used as digital input, only analog
+//#define JETS_BUTTON_INPUT_PIN        A7  
+//#define BUBBLER_BUTTON_INPUT_PIN     A2  
 
 //=== Encoder Inputs ===
 #define ENCODERA    2
@@ -136,6 +136,7 @@ void doEncoderA();
 void doEncoderB();
 
 
+byte i2cCmd; // srg can remove if you get I2C working in class
 
 void setup()
 {
@@ -166,6 +167,9 @@ void setup()
   encoderTemp = hottub.getWaterTempDefault();                
   oldEncoderTemp = hottub.getWaterTempDefault();              
   
+  Wire.begin (SLAVE_ID);
+//  Wire.onReceive (srgi2cReceiveCmd);  // interrupt handler for incoming commands
+//  Wire.onRequest (srgi2cSendData);    // interrupt handler to send data to the master when the master requests it
   
 } // setup()
 
@@ -204,6 +208,8 @@ void loop()
     UpdateDisplay(hottub.getWaterTemp(), LCDMsg );
   }
   
+  
+  
 } // loop()
 
 
@@ -223,12 +229,12 @@ void UpdateDisplay(uint8_t temperature, char statusMsg[] )
 
   
   // get current heater, pump and bubbler status 
-  bool new_Bubbler = hottub.isBubblerOn();
-  bool new_Heater =  hottub.isHeaterOn();
-  bool new_Pump =    hottub.isPumpOn();
+  bool new_Bubbler  = hottub.isBubblerOn();
+  bool new_Heater =   hottub.isHeaterOn();
+  bool new_Pump =     hottub.isPumpOn();
   bool new_Inverted = hottub.isDisplayInverted();
   
-  // See if anything on display has changed
+  // If any display data has changed, then refresh display
   if( new_Bubbler  != prev_Bubbler ||
       new_Heater   != prev_Heater  ||
       new_Pump     != prev_Pump    ||
@@ -442,6 +448,70 @@ void doEncoderB()
     rotating = false;
   }
 } //doEncoderB()
+
+
+
+// Master sends one byte stating which data it wants to get back
+// This function is defined as a static function in header file
+void srgi2cReceiveCmd(int bytesReceived)
+{
+  
+  // If received just one byte, then it's a command for data to send back
+  if (bytesReceived == 1)
+  {
+    i2cCmd = Wire.read();  // read and save the command from Master in i2cSendData()
+  }
+
+  // If we received MAX_I2C_BYTES, then Master is sending data for slave to store
+  if (bytesReceived == MAX_I2C_BYTES)
+  {
+    // Verify 1st byte is save all command
+    i2cCmd = Wire.read(); 
+    if( i2cCmd == CMD_SAVE_ALL )
+    {
+      // First byte = 0 which means master is sending data to slave, read the remaining bytes
+      bool isHotTubOn =  Wire.read(); // 2nd byte
+      bool isBubblerOn = Wire.read(); // 3rd byte
+      bool isPumpOn =    Wire.read(); // 4th byte
+      bool isHeaterOn =  Wire.read(); // 5th byte
+      int  actualTemp =  Wire.read(); // 6th byte
+      hottub.updateFromMaster( isHotTubOn, isBubblerOn, isPumpOn, isHeaterOn, actualTemp ); // update variables in clacc
+    }
+  } // if(MAX_I2C_BYTES)
+  
+}  // ()
+
+
+
+// Master requests data, this function sends it back
+// Defined as a static function in header file
+// Note: On/Off variables are more of a on/off request to the main controller
+void srgi2cSendData()
+{
+  switch(i2cCmd)
+  {
+    case CMD_SLAVE_ID:
+      Wire.write(SLAVE_ID); // return slave address
+      break;
+    case CMD_ONOFF_BTN:
+      Wire.write(10);  // return isHotTubOn
+      break;
+    case CMD_PUMP_BTN:
+      Wire.write(11);  // return isPumpOn
+      break;
+    case CMD_BUBBLE_BTN:
+      Wire.write(12);  // return isBubblerOn
+      break;
+    case CMD_TEMP_SETPT:
+      Wire.write(97);  // return temperature setpoint
+      break;
+    default:
+      Wire.write(-1);
+      break;
+  }
+  i2cCmd = 0; // reset I2C command
+
+} // ()
 
 
 
