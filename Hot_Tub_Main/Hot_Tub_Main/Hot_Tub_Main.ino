@@ -31,28 +31,33 @@ cd Dropbox/Arduino/Hot_Tub_Controller
 
 // I2C Commands to read data from LED backpack user panel
 enum {
-  CMD_SLAVE_ID   = 1,
-  CMD_ONOFF_BTN  = 2,
-  CMD_PUMP_BTN   = 3,
-  CMD_BUBBLE_BTN = 4,
-  CMD_TEMP_SETPT = 5
+  CMD_SAVE_ALL    =  1,  // writes all data from Mater to slave
+  CMD_SLAVE_ID    =  2,
+  CMD_ONOFF_BTN   =  3,
+  CMD_PUMP_BTN    =  4,
+  CMD_BUBBLE_BTN  =  5,
+  CMD_TEMP_SETPT  =  6,
+  ADR_ONOFF_STAT  =  7, // Addresses to save data to slave
+  ADR_PUMP_STAT   =  8,
+  ADR_BUBBLE_STAT =  9,
+  ADR_HEATER_STAT = 10,
+  ADR_TEMP_SETPT  = 11
 };
 
 
-
 //=== Analog Inputs for CTs measuring current ===
-#define CT_PUMP        8  // Pump amps input 20 Amp CT
-#define CT_HEATER1     9  // Heater leg 1 amps, 50 Amp CT
-#define CT_HEATER2    10  // Heater leg 2 amps, 50 Amp CT
-#define CT_BUBBLER    11  // Bubbler amps, 20 Amp CT
+#define CT_PUMP       8  // Pump amps input 20 Amp CT
+#define CT_HEATER1    9  // Heater leg 1 amps, 50 Amp CT
+#define CT_HEATER2   10  // Heater leg 2 amps, 50 Amp CT
+#define CT_BUBBLER   11  // Bubbler amps, 20 Amp CT
 
 //===Analog Inputs from Pressure===
 #define PRESSURE_GAUGE 12  // Pressure, comes from 4-20mA gauge
 
 //=== Output for Solid State Relays ===
-#define PUMP_ON_OFF_OUTPUT_PIN         11
-#define HEATER_ON_OFF_OUTPUT_PIN        9
-#define BUBBLER_ON_OFF_OUTPUT_PIN       8
+#define PUMP_ON_OFF_OUTPUT_PIN     11
+#define HEATER_ON_OFF_OUTPUT_PIN    9
+#define BUBBLER_ON_OFF_OUTPUT_PIN   8
 
 int Temperature_Setpoint = 100;  // Initial setpoint
 
@@ -69,7 +74,6 @@ static uint8_t tempSensor[4][8] =
 };
 
 
-
 // Setup input sensor variables
 float tempTC[3];  // water temperatures
 #define PRE_HEATER     0
@@ -84,7 +88,6 @@ bool InputButtonsCurrentState[3];    // Array for Input buttons, current state
 #define BTN_HOT_TUB_ON_OFF   0  // Hot tub On/Off Button
 #define BTN_JETS_ON_OFF      1  // Jests On/Off Button
 #define BTN_BUBBLER_ON_OFF   2  // Bubbler On/Off button
-
 
 
 // Timer Intervals
@@ -144,18 +147,9 @@ delay(200); // srg debug
 
   static uint32_t lastPumpOnTime; // Millis() Timestamp of when pump was last turned on.  Updates every cycle that pump should be on.  Used to keep pump from cycling on/off too fast
 
-
-I2c.write (SLAVE_ID, CMD_SLAVE_ID);
-delay(1);
-I2c.read(SLAVE_ID, 1);
-int val = I2c.receive();
-Serial.print ("Value of A: ");
-Serial.println (val, DEC);
-delay(100);
-
-
   // Read pushbuttons status and temperature setpoint from user panel
   int status = I2c.write(SLAVE_ID, CMD_ONOFF_BTN);
+  delay(1);
   if( status == I2C_SUCCESS )            // Set pointer to On/Off button status
   {
     I2c.read(SLAVE_ID, 1);                                           // request on/off button status
@@ -170,29 +164,32 @@ delay(100);
     Serial.print(status, HEX );
     Serial.print("  ");
     Serial.println( I2c.receive());
-
   }
 
-  I2c.write(SLAVE_ID, CMD_PUMP_BTN);  
+  I2c.write(SLAVE_ID, CMD_PUMP_BTN);
+  delay(1);
   I2c.read(SLAVE_ID, 1);               
   InputButtonsCurrentState[BTN_JETS_ON_OFF] = I2c.receive();      
 
   I2c.write(SLAVE_ID, CMD_BUBBLE_BTN);  
+  delay(1);
   I2c.read(SLAVE_ID, 1);               
   InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] = I2c.receive();
 
   I2c.write(SLAVE_ID, CMD_TEMP_SETPT);
+  delay(1);
   I2c.read(SLAVE_ID, 1);
   Temperature_Setpoint = I2c.receive();
-
+ 
   Serial.print(InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF]);
   Serial.print("  ");
-  Serial.print(InputButtonsCurrentState[CMD_BUBBLE_BTN]);
+  Serial.print(InputButtonsCurrentState[BTN_BUBBLER_ON_OFF]);
   Serial.print("  ");
   Serial.print(InputButtonsCurrentState[BTN_JETS_ON_OFF]);
   Serial.print("  ");
   Serial.println(Temperature_Setpoint);
-  
+
+ 
   // Check sensor inputs
   if ((long)(millis() - last_sensor_check) > SENSOR_CHECK_INTERVAL)
   {
@@ -323,16 +320,14 @@ delay(100);
     InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] = LOW;
   }
 
-  // Send data to User Panel
-  uint8_t i2cBuf[MAX_I2C_BYTES];
-  i2cBuf[0] = 0; // First byte is zero, this tells slave that Master is sending status data
-  i2cBuf[1] = InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF];
-  i2cBuf[2] = InputButtonsCurrentState[BTN_BUBBLER_ON_OFF];
-  i2cBuf[3] = InputButtonsCurrentState[BTN_JETS_ON_OFF];
-  i2cBuf[4] = digitalRead(HEATER_ON_OFF_OUTPUT_PIN);
-  i2cBuf[5] = (byte) tempTC[PRE_HEATER];
-  I2c.write(SLAVE_ID, 0, i2cBuf, MAX_I2C_BYTES);  // send data to user panel   SRG - 0 is register address, not sure if I'm doing this right
-  
+  // Send data to User Panel via I2C bus
+  I2c.write( SLAVE_ID, ADR_ONOFF_STAT,  InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] ); 
+  I2c.write( SLAVE_ID, ADR_PUMP_STAT,   InputButtonsCurrentState[BTN_JETS_ON_OFF] );  
+  I2c.write( SLAVE_ID, ADR_BUBBLE_STAT, InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] ); 
+  I2c.write( SLAVE_ID, ADR_HEATER_STAT, InputButtonsCurrentState[HEATER_ON_OFF_OUTPUT_PIN] );
+  I2c.write( SLAVE_ID, ADR_TEMP_SETPT,  tempTC[PRE_HEATER] );
+
+
 }  // loop()
 
 

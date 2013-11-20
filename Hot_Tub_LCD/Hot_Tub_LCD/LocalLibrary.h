@@ -29,12 +29,17 @@ static unsigned char __attribute__ ((progmem)) bigDigits[10][256]=
 
 // I2C Commands
 enum {
-  CMD_SAVE_ALL   = 1,  // writes all data from Mater to slave
-  CMD_SLAVE_ID   = 2,
-  CMD_ONOFF_BTN  = 3,
-  CMD_PUMP_BTN   = 4,
-  CMD_BUBBLE_BTN = 5,
-  CMD_TEMP_SETPT = 6
+  CMD_SAVE_ALL    =  1,  // writes all data from Mater to slave
+  CMD_SLAVE_ID    =  2,
+  CMD_ONOFF_BTN   =  3,
+  CMD_PUMP_BTN    =  4,
+  CMD_BUBBLE_BTN  =  5,
+  CMD_TEMP_SETPT  =  6,
+  ADR_ONOFF_STAT  =  7, // Addresses to save data to slave
+  ADR_PUMP_STAT   =  8,
+  ADR_BUBBLE_STAT =  9,
+  ADR_HEATER_STAT = 10,
+  ADR_TEMP_SETPT  = 11
 };
 const byte SLAVE_ID = 46;
 
@@ -77,10 +82,6 @@ public:
   int  getWaterTempDefault();
   void setWaterTemp(int tempSetpoint);
   int  getWaterTempSetpoint();
-
-  void updateFromMaster( bool onOffState, bool bubbleState, bool pumpState, bool heaterState, int actualTemperature ); // can get rid of this if I get I2C working in cpp file
-  
-
 
 protected:
 

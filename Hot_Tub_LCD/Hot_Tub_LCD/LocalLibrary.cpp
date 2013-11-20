@@ -2,9 +2,6 @@
 #include "LocalLibrary.h"
 #include <Wire.h>
 
-bool i2crequest;
-bool i2creceive;
-
 // Static variables are like non-inline member functions in that they are declared in a class
 // declaration and defined in the corresponding source file. http://bit.ly/1djyt1S & http://ibm.co/1bxfbVy
 bool HotTub::_isBubblerOn;
@@ -14,6 +11,7 @@ bool HotTub::_isHeaterOn;
 int  HotTub::_tempSetpoint;
 int  HotTub::_tempActual;
 byte HotTub::_i2cCmd;
+
 
 
 HotTub::HotTub()
@@ -33,7 +31,7 @@ void HotTub::begin()
   pinMode(ENCODERPB,                INPUT);
 
   // Setup I2C handlers
-//  Wire.begin (SLAVE_ID);
+  Wire.begin (SLAVE_ID);
   Wire.onReceive (i2cReceiveCmd);  // interrupt handler for incoming commands
   Wire.onRequest (i2cSendData);    // interrupt handler to send data to the master when the master requests it
 
@@ -48,23 +46,6 @@ void HotTub::begin()
 bool HotTub::processButtons()
 {
   
-  if(i2crequest)  // srg debug
-  {
-    i2crequest = false;
-    digitalWrite(A1, HIGH);
-    delay(30);
-    digitalWrite(A1, LOW);
-  }
-
-  if(i2creceive)
-  {
-    i2creceive = false;
-    digitalWrite(13, HIGH);
-    delay(30);
-    digitalWrite(13, LOW);
-  }
-
-
   if ((long) (millis() - _debounceTimout) < 0 )
   { return false; } // Haven't waited past debounce delay. Just exit
 
@@ -227,36 +208,48 @@ bool HotTub::isDisplayInverted()
   return _isDisplayInverted;
 }
 
-// Master sends one byte stating which data it wants to get back
+// I2C Master sends one byte stating which data it wants to get back
+// If it sends MAX_I2C_BYTES it means the master is sending data for this function to save
 // This function is defined as a static function in header file
 void HotTub::i2cReceiveCmd(int bytesReceived)
 {
-  i2crequest = true;  // srg debug
-  
-  // If received just one byte, then it's a command for data to send back
-  if (bytesReceived == 1)
+  byte i2cBuf[MAX_I2C_BYTES];  // temporary array to hold incomming data
+  for (int a = 0; a < bytesReceived; a++)
   {
-    _i2cCmd = Wire.read();  // read and save the command from Master in i2cSendData()
+    if ( a < MAX_I2C_BYTES )
+    { i2cBuf[a] = Wire.read(); }
+    else
+    { Wire.read(); } // discard any extra data
   }
-
-  // If we received MAX_I2C_BYTES, then Master is sending data for slave to store in the slave
-  if (bytesReceived == MAX_I2C_BYTES)
+  
+  // Copy data from buffer in vars
+  _i2cCmd = i2cBuf[0];
+  if ( bytesReceived > 1 ) // if more then 1 byte was sent it means there is data to save locally
   {
-    // Verify 1st byte is save all command
-    _i2cCmd = Wire.read(); 
-    if( _i2cCmd == CMD_SAVE_ALL )
+    switch ( _i2cCmd )
     {
-      // First byte = 0 which means master is sending data to slave, read the remaining bytes
-      _isHotTubOn =  Wire.read(); // 2nd byte
-      _isBubblerOn = Wire.read(); // 3rd byte
-      _isPumpOn =    Wire.read(); // 4th byte
-      _isHeaterOn =  Wire.read(); // 5th byte
-      _tempActual =  Wire.read(); // 6th byte
-    }
-  } // if(MAX_I2C_BYTES)
+      case ADR_ONOFF_STAT:
+        _isHotTubOn =  i2cBuf[1];
+        break;
+      case ADR_PUMP_STAT:
+        _isBubblerOn =  i2cBuf[1];
+        break;
+      case ADR_BUBBLE_STAT:
+        _isBubblerOn =  i2cBuf[1];
+        break;
+      case ADR_HEATER_STAT:
+        _isHeaterOn =  i2cBuf[1];
+        break;
+      case ADR_TEMP_SETPT:
+        _tempActual =  i2cBuf[1];
+        break;
+      default:
+        break;
+    } // switch
+  } // end if
+  
   
 }  // i2cReceiveCmd()
-
 
 
 // Master requests data, this function sends it back
@@ -264,64 +257,30 @@ void HotTub::i2cReceiveCmd(int bytesReceived)
 // Note: On/Off variables are more of a on/off request to the main controller
 void HotTub::i2cSendData()
 {
-  i2creceive = true; // srg debug
-
   switch(_i2cCmd)
- /* {
-    case CMD_SLAVE_ID:
-      Wire.write(SLAVE_ID); // return slave address
-      break;
-    case CMD_ONOFF_BTN:
-      Wire.write(_isHotTubOn);  // return isHotTubOn
-      break;
-    case CMD_PUMP_BTN:
-      Wire.write(_isPumpOn);  // return isPumpOn
-      break;
-    case CMD_BUBBLE_BTN:
-      Wire.write(_isBubblerOn);  // return isBubblerOn
-      break;
-    case CMD_TEMP_SETPT:
-      Wire.write((byte)_tempSetpoint);  // return temperature setpoint
-      break;
-    default:
-      Wire.write(-1);  // invalid command
-      break;
-  }
- */ // srg debug
- {
-    case CMD_SLAVE_ID:
-      Wire.write(SLAVE_ID); // return slave address
-      break;
-    case CMD_ONOFF_BTN:
-      Wire.write(_isHotTubOn);  // return isHotTubOn
-      break;
-    case CMD_PUMP_BTN:
-      Wire.write(_isPumpOn);  // return isPumpOn
-      break;
-    case CMD_BUBBLE_BTN:
-      Wire.write(_isBubblerOn);  // return isBubblerOn
-      break;
-    case CMD_TEMP_SETPT:
-      Wire.write(97);  // return temperature setpoint
-      break;
-    default:
-      Wire.write(-1);
-      break;
-  }
-  
+   {
+      case CMD_SLAVE_ID:
+        Wire.write(SLAVE_ID); // return slave address
+        break;
+      case CMD_ONOFF_BTN:
+        Wire.write(_isHotTubOn);  // return isHotTubOn
+        break;
+      case CMD_PUMP_BTN:
+        Wire.write(_isPumpOn);  // return isPumpOn
+        break;
+      case CMD_BUBBLE_BTN:
+        Wire.write(_isBubblerOn);  // return isBubblerOn
+        break;
+      case CMD_TEMP_SETPT:
+        Wire.write(_tempSetpoint);  // return temperature setpoint
+        break;
+      default:
+        Wire.write(250);  // invalid i2C command
+        break;
+    } // switch
   
   _i2cCmd = 0; // reset I2C command
 
 } // i2cSendData()
 
-
-// SRG - This is only needed because I can't get the I2C function working in this cpp file
-void HotTub::updateFromMaster( bool onOffState, bool bubbleState, bool pumpState, bool heaterState, int actualTemperature )
-{
-  _isHotTubOn =  onOffState;
-  _isBubblerOn = bubbleState;
-  _isPumpOn =    pumpState; 
-  _isHeaterOn =  heaterState;
-  _tempActual = actualTemperature;
-}  // updateFromMaster()
 
