@@ -82,6 +82,7 @@ public:
   int  getWaterTempDefault();
   void setWaterTemp(int tempSetpoint);
   int  getWaterTempSetpoint();
+  bool isI2cTimeout(int threshold);  // compares last time there was I2C communication to threshold
 
 protected:
 

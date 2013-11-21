@@ -135,8 +135,6 @@ void doEncoderA();
 void doEncoderB();
 
 
-// byte i2cCmd; // srg can remove if you get I2C working in class
-
 void setup()
 {
   
@@ -178,6 +176,7 @@ void loop()
   digitalWrite( ON_OFF_INDICATOR_OUTPUT_PIN,  hottub.isHotTubOn() );
   digitalWrite( PUMP_INDICATOR_OUTPUT_PIN,    hottub.isPumpOn() );
   digitalWrite( BUBBLER_INDICATOR_OUTPUT_PIN, hottub.isBubblerOn() );
+
   
   // See if there is a new setpoint temperature from encoder.  Returns true if there is a new temperature setpoint
   bool isNewTempSetpoint = refreshTempSetpoint();
@@ -185,27 +184,18 @@ void loop()
   // update LCD display
   // UpdateDisplay() will check to see if anything has changed before it sends new data to the display
   char LCDMsg[25];
+
   if ( isNewTempSetpoint == true )
-  {
-    // Display new temperature setpoint
-    strcpy(LCDMsg, "New Setpoint");
-    UpdateDisplay(hottub.getWaterTempSetpoint(), LCDMsg );
-  }
+  { UpdateDisplay(hottub.getWaterTempSetpoint(), "New Setpoint" ); }  // Display new temperature setpoint
   else if ( hottub.isHotTubOn() == false )
-  {
-     // hot tub is off, send actual water tempurature to display
-    sprintf(LCDMsg, "%d F",  hottub.getWaterTemp()); 
-    UpdateDisplay(0, LCDMsg );
-  }
+  { UpdateDisplay(hottub.getWaterTemp(), "HOT TUB IS OFF" );  }  //  // hot tub is off, send actual water temperature to display, but don't display setpoint
   else
   {
-    // send actual water temperature to display
+    // Hot tub is on, send actual water temperature to display
     sprintf(LCDMsg, "Setpoint = %d",  hottub.getWaterTempSetpoint()); 
     UpdateDisplay(hottub.getWaterTemp(), LCDMsg );
   }
-  
-  
-  
+
 } // loop()
 
 
@@ -222,7 +212,6 @@ void UpdateDisplay(uint8_t temperature, char statusMsg[] )
   static bool    prev_Bubbler;
   static bool    prev_Heater;
   static bool    prev_Pump;
-
   
   // get current heater, pump and bubbler status 
   bool new_Bubbler  = hottub.isBubblerOn();
@@ -262,68 +251,55 @@ void UpdateDisplay(uint8_t temperature, char statusMsg[] )
     
     glcd.clear();
     
-    if( hottub.isHotTubOn() )
-    { 
-      // Position for big digits
-      w = 32;
-      h = 63;
-      x = 20;
-      y = 0;
-      
-      // split the temperature into three separate digits. Get rightmost (digit3) digit first
-      digit3 = tempval  % 10;  // gets last digit
-      tempval = tempval / 10;  // divide by 10 to get rid of 3rd digit
-      digit2 = tempval  % 10;  // gets middle digit (assuming a 3 digit number)
-      if (temperature >= 100)
-      { digit1 = 1;}
-      else
-      { digit1 = 0;}
-      
-      glcd.drawbitmap(x, y,       &bigDigits[digit1][0], w, h, BLACK);
-      glcd.drawbitmap(w+x-5, y,   &bigDigits[digit2][0], w, h, BLACK);
-      glcd.drawbitmap(w+w+x-8, y, &bigDigits[digit3][0], w, h, BLACK);
-      
-        // Display status of heater, bubbler and jets
-      if( new_Bubbler == true )
-      { glcd.drawstring(3, 0, "Bubble"); }
-      if( new_Heater == true )
-      { glcd.drawstring(50, 0, "Heat"); }
-      if( new_Pump == true )
-      { glcd.drawstring(100, 0, "Jets"); }
-      
-      int leftPos = (128 - strlen(statusMsg) * 6) / 2;
-      glcd.drawstring(leftPos, 7, statusMsg);
-      
-      // Set LCD backlight color
-      int red = -7.2857 * (float) temperature + 765;
-      if (temperature >= 105)
-      { red = 0; }
-      if (temperature <= 70 )
-      { red = 255; }
-      analogWrite(BACKLIGHT_RED, red);  // 0=on, 255=off
-      analogWrite(BACKLIGHT_GRN, 255);
-      analogWrite(BACKLIGHT_BLU, 255 - red);
-    }
-    else
-    { // Hot tub is off
-      analogWrite(BACKLIGHT_RED, 10);  // 0=on, 255=off
-      analogWrite(BACKLIGHT_GRN, 255);
-      analogWrite(BACKLIGHT_BLU, 255);
-      
-      glcd.drawstring(22, 3, "HOT TUB IS OFF");
-      sprintf(statusMsg, "%d F", temperature);
-      glcd.drawstring(50, 5, statusMsg);
-    }
+    w = 32;
+    h = 63;
+    x = 20;
+    y = 0;
     
+    // split the temperature into three separate digits. Get rightmost (digit3) digit first
+    digit3 = tempval  % 10;  // gets last digit
+    tempval = tempval / 10;  // divide by 10 to get rid of 3rd digit
+    digit2 = tempval  % 10;  // gets middle digit (assuming a 3 digit number)
+    if (temperature >= 100)
+    { digit1 = 1;}
+    else
+    { digit1 = 0;}
+    
+    glcd.drawbitmap(x, y,       &bigDigits[digit1][0], w, h, BLACK);
+    glcd.drawbitmap(w+x-5, y,   &bigDigits[digit2][0], w, h, BLACK);
+    glcd.drawbitmap(w+w+x-8, y, &bigDigits[digit3][0], w, h, BLACK);
+    
+      // Display status of heater, bubbler and jets
+    if( new_Bubbler == true )
+    { glcd.drawstring(3, 0, "Bubble"); }
+    if( new_Heater == true )
+    { glcd.drawstring(50, 0, "Heat"); }
+    if( new_Pump == true )
+    { glcd.drawstring(100, 0, "Jets"); }
+
+    // display status message at bottom of screen
+    int leftPos = (128 - strlen(statusMsg) * 6) / 2;
+    glcd.drawstring(leftPos, 7, statusMsg);
+    
+    // Set LCD backlight color
+    int red = -7.2857 * (float) temperature + 765;
+    if (temperature >= 105)
+    { red = 0; }
+    if (temperature <= 70 )
+    { red = 255; }
+    analogWrite(BACKLIGHT_RED, red);  // 0=on, 255=off
+    analogWrite(BACKLIGHT_GRN, 255);
+    analogWrite(BACKLIGHT_BLU, 255 - red);
+
     glcd.display();
   }  // end something changed
   
   // save display setting and compare on next loop
   prev_dispInverted = new_Inverted;
-  prev_temperature = temperature;
-  prev_Bubbler = new_Bubbler;
-  prev_Heater =  new_Heater;
-  prev_Pump =    new_Pump;
+  prev_temperature =  temperature;
+  prev_Bubbler =      new_Bubbler;
+  prev_Heater =       new_Heater;
+  prev_Pump =         new_Pump;
   strcpy(prev_statusMsg, statusMsg);
   
 } // end UpdateDisplay()
@@ -347,8 +323,6 @@ void EncoderSetup()
   
     // encoder pin on interrupt 1 (pin 3)
   attachInterrupt(interruptB, doEncoderB, CHANGE);
-  
-  Serial.println(F("EncoderSetup() complete"));
   
 } // EncoderSetup()
 

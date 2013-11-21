@@ -12,7 +12,10 @@ int  HotTub::_tempSetpoint;
 int  HotTub::_tempActual;
 byte HotTub::_i2cCmd;
 
+int srgtempdata; 
+int i2cCount; 
 
+uint32_t _lastI2cTime; // millis() timestamp of most recent I2C communication
 
 HotTub::HotTub()
 {
@@ -45,7 +48,14 @@ void HotTub::begin()
 // Returns true if any pushbutton press was detected
 bool HotTub::processButtons()
 {
-  
+/*    static int previ2cCount;
+    if (i2cCount > previ2cCount)
+    {
+    Serial.print("I2C Command : "); Serial.print(srgtempdata); 
+    Serial.print("  "); Serial.println(i2cCount);
+    previ2cCount = i2cCount;
+    }   */
+    
   if ((long) (millis() - _debounceTimout) < 0 )
   { return false; } // Haven't waited past debounce delay. Just exit
 
@@ -208,22 +218,35 @@ bool HotTub::isDisplayInverted()
   return _isDisplayInverted;
 }
 
+// Compares the last time there was I2C communication to the threshold and returns true if it timed out
+bool isI2cTimeout(int threshold)
+{
+   if ( (millis() - _lastI2cTime) > (threshold * 1000) )
+   { return true; }  // I2C timed out
+   else
+   { return false; } // I2C ok
+}
+
 // I2C Master sends one byte stating which data it wants to get back
 // If it sends MAX_I2C_BYTES it means the master is sending data for this function to save
 // This function is defined as a static function in header file
 void HotTub::i2cReceiveCmd(int bytesReceived)
 {
+  i2cCount++; //srg
+  _lastI2cTime = millis(); // Track last time I2C communication was triggered
+  
   byte i2cBuf[MAX_I2C_BYTES];  // temporary array to hold incomming data
   for (int a = 0; a < bytesReceived; a++)
   {
     if ( a < MAX_I2C_BYTES )
-    { i2cBuf[a] = Wire.read(); }
+    { i2cBuf[a] = Wire.read(); }  //srg
     else
     { Wire.read(); } // discard any extra data
   }
   
   // Copy data from buffer in vars
   _i2cCmd = i2cBuf[0];
+srgtempdata =   i2cBuf[0]; // srg
   if ( bytesReceived > 1 ) // if more then 1 byte was sent it means there is data to save locally
   {
     switch ( _i2cCmd )
@@ -257,6 +280,9 @@ void HotTub::i2cReceiveCmd(int bytesReceived)
 // Note: On/Off variables are more of a on/off request to the main controller
 void HotTub::i2cSendData()
 {
+  
+  _lastI2cTime = millis(); // Track last time I2C communication was triggered
+
   switch(_i2cCmd)
    {
       case CMD_SLAVE_ID:
@@ -279,7 +305,7 @@ void HotTub::i2cSendData()
         break;
     } // switch
   
-  _i2cCmd = 0; // reset I2C command
+//  _i2cCmd = 0; // reset I2C command
 
 } // i2cSendData()
 

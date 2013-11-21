@@ -19,12 +19,11 @@ cd Dropbox/Arduino/Hot_Tub_Controller
 #include <OneWire.h>    // http://www.pjrc.com/teensy/td_libs_OneWire.html  http://playground.arduino.cc/Learning/OneWire
 #include <DallasTemperature.h> // http://milesburton.com/index.php?title=Dallas_Temperature_Control_Library
 #include "I2C.h"  // use for I2C communication  http://dsscircuits.com/articles/arduino-i2c-master-library.html
-
-
-// Include application, user and local libraries
 #include "LocalLibrary.h"
 
-#define ONE_WIRE_BUS 29 // OneWire data pin
+// #define MEGA  // set this if using an Arduino Mega
+#define PANSTAMP // set this if using Panstamp
+
 #define SLAVE_ID     46 // I2C address of LED backpack on user panel
 #define I2C_SUCCESS   0 // When I2C read/writes are sucessful, function returns 0
 #define MAX_I2C_BYTES 6 // Max I2C bytes to send data to slave
@@ -44,20 +43,44 @@ enum {
   ADR_TEMP_SETPT  = 11
 };
 
+// Define I/0 Pins
+#ifdef MEGA
+  //=== Analog Inputs for CTs measuring current ===
+  #define CT_PUMP       8  // Pump amps input 20 Amp CT
+  #define CT_HEATER1    9  // Heater leg 1 amps, 50 Amp CT
+  #define CT_HEATER2   10  // Heater leg 2 amps, 50 Amp CT
+  #define CT_BUBBLER   11  // Bubbler amps, 20 Amp CT
+  
+  //===Analog Inputs from Pressure===
+  #define PRESSURE_GAUGE 12  // Pressure, comes from 4-20mA gauge
+  
+  //=== Output for Solid State Relays ===
+  #define PUMP_ON_OFF_OUTPUT_PIN     11
+  #define HEATER_ON_OFF_OUTPUT_PIN    9
+  #define BUBBLER_ON_OFF_OUTPUT_PIN   8
+  
+  #define ONE_WIRE_BUS 29 // OneWire data pin
+#endif
 
-//=== Analog Inputs for CTs measuring current ===
-#define CT_PUMP       8  // Pump amps input 20 Amp CT
-#define CT_HEATER1    9  // Heater leg 1 amps, 50 Amp CT
-#define CT_HEATER2   10  // Heater leg 2 amps, 50 Amp CT
-#define CT_BUBBLER   11  // Bubbler amps, 20 Amp CT
+#ifdef PANSTAMP
+  //=== Analog Inputs for CTs measuring current ===
+  #define CT_PUMP       0  // Pump amps input 20 Amp CT
+  #define CT_HEATER1    1  // Heater leg 1 amps, 50 Amp CT
+  #define CT_HEATER2    2  // Heater leg 2 amps, 50 Amp CT
+  #define CT_BUBBLER    3  // Bubbler amps, 20 Amp CT
+  
+  //===Analog Inputs from Pressure===
+  #define PRESSURE_GAUGE 6  // Pressure, comes from 4-20mA gauge
+  
+  //=== Output for Solid State Relays ===
+  #define PUMP_ON_OFF_OUTPUT_PIN      3
+  #define HEATER_ON_OFF_OUTPUT_PIN    4
+  #define BUBBLER_ON_OFF_OUTPUT_PIN   5
+  
+  #define ONE_WIRE_BUS 6 // OneWire data pin
+#endif
 
-//===Analog Inputs from Pressure===
-#define PRESSURE_GAUGE 12  // Pressure, comes from 4-20mA gauge
 
-//=== Output for Solid State Relays ===
-#define PUMP_ON_OFF_OUTPUT_PIN     11
-#define HEATER_ON_OFF_OUTPUT_PIN    9
-#define BUBBLER_ON_OFF_OUTPUT_PIN   8
 
 int Temperature_Setpoint = 100;  // Initial setpoint
 
@@ -143,28 +166,17 @@ void setup()
 void loop()
 {
 
-delay(200); // srg debug
+delay(400); // srg debug
 
   static uint32_t lastPumpOnTime; // Millis() Timestamp of when pump was last turned on.  Updates every cycle that pump should be on.  Used to keep pump from cycling on/off too fast
 
   // Read pushbuttons status and temperature setpoint from user panel
-  int status = I2c.write(SLAVE_ID, CMD_ONOFF_BTN);
+  I2c.write(SLAVE_ID, CMD_ONOFF_BTN);
   delay(1);
-  if( status == I2C_SUCCESS )            // Set pointer to On/Off button status
-  {
-    I2c.read(SLAVE_ID, 1);                                           // request on/off button status
-    InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] = I2c.receive();    // Read the on/off button status
-  }
-  else
-  {
-    Serial.print(F("I2C Write Failed - on/off btn.  Status = "));
-    Serial.print(status, HEX);
-    Serial.print("  ");
-    status = I2c.read(SLAVE_ID, 1);
-    Serial.print(status, HEX );
-    Serial.print("  ");
-    Serial.println( I2c.receive());
-  }
+  I2c.read(SLAVE_ID, 1);                                           // request on/off button status
+  InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] = I2c.receive();    // Read the on/off button status from slave
+
+  delay(2);
 
   I2c.write(SLAVE_ID, CMD_PUMP_BTN);
   delay(1);
@@ -173,22 +185,13 @@ delay(200); // srg debug
 
   I2c.write(SLAVE_ID, CMD_BUBBLE_BTN);  
   delay(1);
-  I2c.read(SLAVE_ID, 1);               
+  I2c.read(SLAVE_ID, 1);
   InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] = I2c.receive();
 
   I2c.write(SLAVE_ID, CMD_TEMP_SETPT);
   delay(1);
   I2c.read(SLAVE_ID, 1);
   Temperature_Setpoint = I2c.receive();
- 
-  Serial.print(InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF]);
-  Serial.print("  ");
-  Serial.print(InputButtonsCurrentState[BTN_BUBBLER_ON_OFF]);
-  Serial.print("  ");
-  Serial.print(InputButtonsCurrentState[BTN_JETS_ON_OFF]);
-  Serial.print("  ");
-  Serial.println(Temperature_Setpoint);
-
  
   // Check sensor inputs
   if ((long)(millis() - last_sensor_check) > SENSOR_CHECK_INTERVAL)
@@ -204,7 +207,7 @@ delay(200); // srg debug
     CheckAlarms();
   }
 
-//  PrintStatus();  // Print for debugging
+  PrintStatus();  // Print for debugging
   
 
   // Turn off pump         srg - pump sometimes turns off right after turning on
@@ -320,13 +323,19 @@ delay(200); // srg debug
     InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] = LOW;
   }
 
-  // Send data to User Panel via I2C bus
-  I2c.write( SLAVE_ID, ADR_ONOFF_STAT,  InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] ); 
-  I2c.write( SLAVE_ID, ADR_PUMP_STAT,   InputButtonsCurrentState[BTN_JETS_ON_OFF] );  
-  I2c.write( SLAVE_ID, ADR_BUBBLE_STAT, InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] ); 
-  I2c.write( SLAVE_ID, ADR_HEATER_STAT, InputButtonsCurrentState[HEATER_ON_OFF_OUTPUT_PIN] );
-  I2c.write( SLAVE_ID, ADR_TEMP_SETPT,  tempTC[PRE_HEATER] );
 
+  // Send data to User Panel via I2C bus
+  I2c.write( SLAVE_ID, ADR_ONOFF_STAT,  InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] );  
+  delay(15);  // srg temp
+  I2c.write( SLAVE_ID, ADR_PUMP_STAT,   InputButtonsCurrentState[BTN_JETS_ON_OFF] );  
+  delay(15);
+  I2c.write( SLAVE_ID, ADR_BUBBLE_STAT, InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] ); 
+  delay(15);
+  I2c.write( SLAVE_ID, ADR_HEATER_STAT, digitalRead(HEATER_ON_OFF_OUTPUT_PIN) );
+  delay(15);
+  I2c.write( SLAVE_ID, ADR_TEMP_SETPT,  tempTC[PRE_HEATER] );
+  delay(15);
+  
 
 }  // loop()
 
@@ -531,7 +540,7 @@ void CheckAlarms()
 //*********************************************************************************
 void OutputAlarm(char AlarmText[])
 {
-  Serial.print("Alarm: ");
+  Serial.print(F("Alarm: "));
   Serial.println(AlarmText);
 } // OutputAlarm()
 
@@ -549,11 +558,11 @@ void PrintStatus()
   if ((long)(millis() - PrintDelay) > 0)
   {
     PrintDelay = millis() + 500UL;
- /*   
+    
     //Print Pushbutton state and Led indicator state
     if(cntHeading > 40 || millis() < 5000)
     {
-      Serial.println("OnOff\tPump\tHeat\tcooldn\tpumpdly\theatdly");
+      Serial.println("OnOff\tPump\tHeat\tA-temp\tsetpt\tbubble");
       cntHeading = 0;
     }
     cntHeading++;
@@ -568,7 +577,20 @@ void PrintStatus()
     Serial.print(digitalRead(HEATER_ON_OFF_OUTPUT_PIN));
     Serial.print(NeedHeat());
     Serial.print("\t");
-    
+
+    Serial.print(tempTC[PRE_HEATER]);
+    Serial.print("\t");
+
+    Serial.print(Temperature_Setpoint);
+    Serial.print("\t");
+
+    Serial.print(InputButtonsCurrentState[BTN_BUBBLER_ON_OFF]);
+    Serial.print(digitalRead(BUBBLER_ON_OFF_OUTPUT_PIN));
+    Serial.print("\t");
+
+    Serial.println("");
+
+/*    
     if (heater_cooldown_timer > millis())
 //    { Serial.print((heater_cooldown_timer - millis())/1000);}  // print seconds heaters need to cooldown before pump can turn off
     { Serial.print(heater_cooldown_timer);}  // print seconds heaters need to cooldown before pump can turn off
@@ -576,13 +598,12 @@ void PrintStatus()
     { Serial.print(heater_cooldown_timer);}
     Serial.print("\t");
     
-    Serial.print((int)((millis() - last_pump_on_check)/1000));
-    Serial.print("\t");
     
     Serial.print((int)((millis() - last_heater_on_check)/1000));
     Serial.println();
- 
- */   
+*/
+
+ /*   
     
      if(cntHeading > 40)
      {
@@ -605,7 +626,7 @@ void PrintStatus()
      Serial.print("\t");
      Serial.print(bubbler_amps);
      Serial.println();
-    
+*/    
     
     /*
      if(cntHeading > 40)
