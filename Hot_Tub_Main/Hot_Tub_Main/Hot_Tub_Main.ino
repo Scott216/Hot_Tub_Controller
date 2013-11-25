@@ -176,8 +176,6 @@ delay(400); // srg debug
   I2c.read(SLAVE_ID, 1);                                           // request on/off button status
   InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] = I2c.receive();    // Read the on/off button status from slave
 
-  delay(2);
-
   I2c.write(SLAVE_ID, CMD_PUMP_BTN);
   delay(1);
   I2c.read(SLAVE_ID, 1);               
@@ -187,6 +185,7 @@ delay(400); // srg debug
   delay(1);
   I2c.read(SLAVE_ID, 1);
   InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] = I2c.receive();
+Serial.print("Get Bubbler btn status: "); Serial.println(InputButtonsCurrentState[BTN_BUBBLER_ON_OFF]); // srg debug
 
   I2c.write(SLAVE_ID, CMD_TEMP_SETPT);
   delay(1);
@@ -314,6 +313,7 @@ delay(400); // srg debug
   {
     digitalWrite(BUBBLER_ON_OFF_OUTPUT_PIN, HIGH);
     last_bubbler_on_check = millis();
+Serial.println("Turning on bubbler..."); // srg debug    
   }
   
   // Turn off bubbler
@@ -321,6 +321,7 @@ delay(400); // srg debug
   {
     digitalWrite(BUBBLER_ON_OFF_OUTPUT_PIN, LOW);
     InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] = LOW;
+Serial.println("Turning off bubbler..."); // srg debug    
   }
 
 
@@ -329,7 +330,8 @@ delay(400); // srg debug
   delay(15);  // srg temp
   I2c.write( SLAVE_ID, ADR_PUMP_STAT,   InputButtonsCurrentState[BTN_JETS_ON_OFF] );  
   delay(15);
-  I2c.write( SLAVE_ID, ADR_BUBBLE_STAT, InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] ); 
+  I2c.write( SLAVE_ID, ADR_BUBBLE_STAT, InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] );
+Serial.print("Send Bubler status to LCD: "); Serial.println(InputButtonsCurrentState[BTN_BUBBLER_ON_OFF]); // srg debug
   delay(15);
   I2c.write( SLAVE_ID, ADR_HEATER_STAT, digitalRead(HEATER_ON_OFF_OUTPUT_PIN) );
   delay(15);

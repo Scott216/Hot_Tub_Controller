@@ -22,9 +22,9 @@ static unsigned char __attribute__ ((progmem)) bigDigits[10][256]=
 };
 
 #define HOT_TUB_BUTTON_INPUT_PIN     A7   // Note: A6 & A7 on pro-mini can't be used as digital input, only analog
-#define JETS_BUTTON_INPUT_PIN        A6
-#define BUBBLER_BUTTON_INPUT_PIN     A2
-#define ENCODERPB  12    // Encoder pushbutton - rotates LCD text 180 degrees
+#define JETS_BUTTON_INPUT_PIN        A2
+#define BUBBLER_BUTTON_INPUT_PIN     A6
+#define ENCODERPB                    12    // Encoder pushbutton - rotates LCD text 180 degrees
 #define MAX_I2C_BYTES 6  // Max bytes master will send
 
 // I2C Commands
@@ -45,7 +45,7 @@ const byte SLAVE_ID = 46;
 
 
 #define BTN_ON LOW // Pushbuttons are low if they are on
-const uint8_t debounceDelay = 25; // debounce time in mS
+const uint8_t debounceDelay = 200; // debounce time in mS
 
 class HotTub
 {
@@ -88,9 +88,6 @@ protected:
 
 private:
   uint32_t _debounceTimout;
-  bool _requestPumpOn;
-  bool _requestHotTubOn;
-  bool _requestBubblerOn;
   bool _isDisplayInverted;
   static void i2cReceiveCmd(int bytesReceived);  // I2C Receive Event.  Make static so you don't need an instance of the class
   static void i2cSendData(); // sends data back to master
@@ -101,6 +98,7 @@ private:
 
 
 #endif  //LCD_Backpack_LocalLibrary_h
+
 
 
 

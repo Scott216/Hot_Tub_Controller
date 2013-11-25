@@ -27,18 +27,8 @@ A5 - I2C SCL (330Ω inline resistor to reduce volts)
 A6 - On/off pushbutton (10kΩ pullup resistor)
 A7 - Jets pushbutton (10kΩ pullup resistor)
 
-Pushbottons have built-in resistor
-Use 10kΩ pull-up resistors on all buttons 
-
-Data I2C backpack (slave) will pass back to master
-pushbutton status, 3 LED buttons + encoder button.  This can be done in 1 byte by setting the bits
-Encoder temperature setting -  1 byte
-
-Data that will be sent to I2C backpack
-Pushbutton LED status - this can be one byte, just set bits
-On/Off status of Jets, heater, bubbler - can be one byte
-Current temperature
-Setpoint temperature
+Pushbuttons have built-in resistor for LED
+Use 10k pull-up resistors on all buttons 
 
 I2C data flow
 --------------------
@@ -55,7 +45,6 @@ From Main board to backback
  bubbler on/off status
  heater on/off status
  water temperature
- default water temp setpoint
 
 */
 
@@ -73,18 +62,14 @@ From Main board to backback
 
 //=== Output for LEDs in pushbuttons ===
 #define ON_OFF_INDICATOR_OUTPUT_PIN   A0   // Shows if hot tub is on or off
-#define PUMP_INDICATOR_OUTPUT_PIN     13 
-#define BUBBLER_INDICATOR_OUTPUT_PIN  A1 
+#define PUMP_INDICATOR_OUTPUT_PIN     A1 
+#define BUBBLER_INDICATOR_OUTPUT_PIN  13 
 
-//=== Pushbutton Inputs ===
-//#define HOT_TUB_BUTTON_INPUT_PIN     A6  // Note: A6 & A7 on pro-mini can't be used as digital input, only analog
-//#define JETS_BUTTON_INPUT_PIN        A7  
-//#define BUBBLER_BUTTON_INPUT_PIN     A2  
+// Pushbutton inputs are in LocalLibrary.h
 
 //=== Encoder Inputs ===
 #define ENCODERA    2
 #define ENCODERB    3
-#define ENCODERPB  12    // Encoder pushbutton - flips LCD so it can be read from the other side
 
 
 // LCD I/O
@@ -418,5 +403,6 @@ void doEncoderB()
     rotating = false;
   }
 } //doEncoderB()
+
 
 

@@ -12,8 +12,6 @@ int  HotTub::_tempSetpoint;
 int  HotTub::_tempActual;
 byte HotTub::_i2cCmd;
 
-int srgtempdata; 
-int i2cCount; 
 
 uint32_t _lastI2cTime; // millis() timestamp of most recent I2C communication
 
@@ -29,8 +27,8 @@ HotTub::~HotTub()
 
 void HotTub::begin()
 {
-  // Note: HOT_TUB_BUTTON_INPUT_PIN and JETS_BUTTON_INPUT_PIN are on pins A6 & A6 which can't be configured as digital
-  pinMode(BUBBLER_BUTTON_INPUT_PIN, INPUT);
+  // Note: HOT_TUB_BUTTON_INPUT_PIN and BUBBLER_BUTTON_INPUT_PIN are on pins A6 & A7 which can't be configured as digital
+  pinMode(JETS_BUTTON_INPUT_PIN, INPUT);
   pinMode(ENCODERPB,                INPUT);
 
   // Setup I2C handlers
@@ -48,13 +46,6 @@ void HotTub::begin()
 // Returns true if any pushbutton press was detected
 bool HotTub::processButtons()
 {
-/*    static int previ2cCount;
-    if (i2cCount > previ2cCount)
-    {
-    Serial.print("I2C Command : "); Serial.print(srgtempdata); 
-    Serial.print("  "); Serial.println(i2cCount);
-    previ2cCount = i2cCount;
-    }   */
     
   if ((long) (millis() - _debounceTimout) < 0 )
   { return false; } // Haven't waited past debounce delay. Just exit
@@ -64,50 +55,31 @@ bool HotTub::processButtons()
   {
     _debounceTimout = millis() + debounceDelay;
     if (isHotTubOn())
-    {
-      setHotTubOff();
-      _requestHotTubOn = false;
-    }
+    { setHotTubOff(); }
     else
-    {
-      setHotTubOn();
-      _requestHotTubOn = true;
-    }
+    { setHotTubOn(); }
     return true;
   }
 
   // Check Pump button
-  if( analogRead(JETS_BUTTON_INPUT_PIN)< 100 )
+  if( digitalRead(JETS_BUTTON_INPUT_PIN) == BTN_ON )
   {
     _debounceTimout = millis() + debounceDelay;
     if (isPumpOn())
-    {
-      setPumpOff();
-      _requestPumpOn = false;
-    }
+    { setPumpOff(); }
     else
-    {
-      setPumpOn();
-      _requestPumpOn = true;
-    }
+    { setPumpOn(); }
     return true;
   }
 
-
   // Check Bubbler button
-  if( digitalRead(BUBBLER_BUTTON_INPUT_PIN) == BTN_ON )
+  if( analogRead(BUBBLER_BUTTON_INPUT_PIN) < 100 )
   {
     _debounceTimout = millis() + debounceDelay;
     if (isBubblerOn())
-    {
-      setBubblerOff();
-      _requestBubblerOn = false;
-    }
+    { setBubblerOff(); }
     else
-    {
-      setBubblerOn();
-      _requestBubblerOn = true;
-    }
+    { setBubblerOn(); }
     return true;
   }
 
@@ -232,7 +204,7 @@ bool isI2cTimeout(int threshold)
 // This function is defined as a static function in header file
 void HotTub::i2cReceiveCmd(int bytesReceived)
 {
-  i2cCount++; //srg
+
   _lastI2cTime = millis(); // Track last time I2C communication was triggered
   
   byte i2cBuf[MAX_I2C_BYTES];  // temporary array to hold incomming data
@@ -246,7 +218,7 @@ void HotTub::i2cReceiveCmd(int bytesReceived)
   
   // Copy data from buffer in vars
   _i2cCmd = i2cBuf[0];
-srgtempdata =   i2cBuf[0]; // srg
+
   if ( bytesReceived > 1 ) // if more then 1 byte was sent it means there is data to save locally
   {
     switch ( _i2cCmd )
@@ -255,7 +227,7 @@ srgtempdata =   i2cBuf[0]; // srg
         _isHotTubOn =  i2cBuf[1];
         break;
       case ADR_PUMP_STAT:
-        _isBubblerOn =  i2cBuf[1];
+        _isPumpOn =  i2cBuf[1];
         break;
       case ADR_BUBBLE_STAT:
         _isBubblerOn =  i2cBuf[1];
@@ -270,7 +242,6 @@ srgtempdata =   i2cBuf[0]; // srg
         break;
     } // switch
   } // end if
-  
   
 }  // i2cReceiveCmd()
 
@@ -308,5 +279,6 @@ void HotTub::i2cSendData()
 //  _i2cCmd = 0; // reset I2C command
 
 } // i2cSendData()
+
 
 
