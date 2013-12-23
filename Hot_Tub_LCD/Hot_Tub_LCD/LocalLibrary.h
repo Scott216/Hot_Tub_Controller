@@ -58,7 +58,7 @@ class HotTub
   static int  _tempSetpoint;
   static int  _tempActual;
   static byte _i2cCmd;
-
+  static uint32_t _buttonChangeTime;
 
 public:
   // Public restriction allows any part of the program, including parts outside the class,
@@ -75,8 +75,10 @@ public:
   void setHotTubOff();
   void setPumpOn();
   void setPumpOff();
+  uint32_t getPumpOnTime();  // returns millis time when pump was turned on
   void setBubblerOn();
   void setBubblerOff();
+  uint32_t getBubblerOnTime();  // returns millis time when bubbler was turned on
   bool processButtons(); // read inputs for pushbuttons including encoder pushbutton
   int  getWaterTemp();
   int  getWaterTempDefault();
@@ -87,8 +89,11 @@ public:
 protected:
 
 private:
-  uint32_t _debounceTimout;
+  uint32_t _debounceTimout;  // used to debounce pushbuttons
   bool _isDisplayInverted;
+  uint32_t _bubblerStartTime;  // used to turn bubbles off after 15 minutes
+  uint32_t _pumpStartTime;     // used to turn pump off after 30 minutes
+
   static void i2cReceiveCmd(int bytesReceived);  // I2C Receive Event.  Make static so you don't need an instance of the class
   static void i2cSendData(); // sends data back to master
 

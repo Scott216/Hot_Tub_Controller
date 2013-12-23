@@ -2,6 +2,7 @@
 
 directory: cd Dropbox/Arduino/Hot_Tub_Controller/ 
 
+
 0 -  TX
 1 -  RX
 2 -  Encoder A
@@ -15,17 +16,16 @@ directory: cd Dropbox/Arduino/Hot_Tub_Controller/
 10 - LCD Green (PWM), don't need resistor
 11 - LCD Blue (PWM), don't need resistor
 12 - Encoder pushbutton (10kΩ pullup resistor)
-13 - On/Off LED 
+13 - Bubbler LED 
 
-
-A0 - Jets LED
-A1 - Bubble LED
-A2 - Bubble pushbutton (10kΩ pullup resistor)
+A0 - On/Off LED
+A1 - Pump LED
+A2 - Jets pushbutton (10kΩ pullup resistor)
 A3 - N/C
 A4 - I2C SDA (330Ω inline resistor to reduce volts)
 A5 - I2C SCL (330Ω inline resistor to reduce volts)
-A6 - On/off pushbutton (10kΩ pullup resistor)
-A7 - Jets pushbutton (10kΩ pullup resistor)
+A6 - Bubbler pushbutton (10kΩ pullup resistor)
+A7 - On/Off pushbutton (10kΩ pullup resistor)
 
 Pushbuttons have built-in resistor for LED
 Use 10k pull-up resistors on all buttons 
@@ -85,6 +85,8 @@ From Main board to backback
 ST7565 glcd( LCD_SID, LCD_SCLK, LCD_A0, LCD_RST, LCD_CS);   // create LCD object
 
 
+#define MINUTE 60000
+
 // Set Max and Min water temp settings with encoder
 #define WATER_TEMP_MAX     105
 #define WATER_TEMP_MIN      70
@@ -102,6 +104,7 @@ enum PinAssignments
 volatile unsigned int encoderTemp;  // counter for the dial  http://arduino.cc/en/Reference/Volatile
 unsigned int oldEncoderTemp;        // change management
 boolean rotating = false;           // debounce management
+uint32_t encoderChangeTime;         // timestamp encoder value was last changed
 
 // interrupt service routine variables
 boolean A_set = false;
@@ -134,6 +137,11 @@ void setup()
   pinMode(BACKLIGHT_BLU,   OUTPUT);
   pinMode(ENCODERPB, INPUT_PULLUP);
 
+    // LED Color, 0=on, 255=off
+    analogWrite(BACKLIGHT_RED, 0); 
+    analogWrite(BACKLIGHT_GRN, 0);
+    analogWrite(BACKLIGHT_BLU, 0);
+
   // Initialize Encoder pins
   EncoderSetup();
   
@@ -143,7 +151,6 @@ void setup()
   glcd.clear();
 
   hottub.begin(); // configures pushbutton pins and I2C communication
-  
   
   // Initialize encoder default temperature values
   encoderTemp = hottub.getWaterTempDefault();                
@@ -156,6 +163,15 @@ void loop()
 {
   
   hottub.processButtons();   // Read button state and update on/off status of Hot tub, pump, bubbler lights inside the pushbuttons
+  
+   // Turn bubbles off after 15 minutes
+   if( (long)( millis() - hottub.getBubblerOnTime() ) > 15UL * MINUTE ) 
+   { hottub.setBubblerOff(); }
+  
+  // Turn pump off after 30 minutes
+  if( (long)(millis() - hottub.getPumpOnTime() ) > 30UL * MINUTE) 
+  { hottub.setPumpOff(); }
+  
   
   // Update pushbuttonbutton LEDs
   digitalWrite( ON_OFF_INDICATOR_OUTPUT_PIN,  hottub.isHotTubOn() );
@@ -267,6 +283,7 @@ void UpdateDisplay(uint8_t temperature, char statusMsg[] )
     glcd.drawstring(leftPos, 7, statusMsg);
     
     // Set LCD backlight color
+/*    Don't change backlight color based on temperature, this didn't work very well
     int red = -7.2857 * (float) temperature + 765;
     if (temperature >= 105)
     { red = 0; }
@@ -275,6 +292,8 @@ void UpdateDisplay(uint8_t temperature, char statusMsg[] )
     analogWrite(BACKLIGHT_RED, red);  // 0=on, 255=off
     analogWrite(BACKLIGHT_GRN, 255);
     analogWrite(BACKLIGHT_BLU, 255 - red);
+*/
+  
 
     glcd.display();
   }  // end something changed
@@ -371,18 +390,22 @@ bool refreshTempSetpoint()
 //*********************************************************************************
 void doEncoderA()
 {
-    // debounce
-  if ( rotating ) delay(1);  // wait a little until the bouncing is done
+  // debounce
+  if ( rotating ) 
+  { delay(1); } // wait a little until the bouncing is done
   
-    // Test transition, did things really change?
+  // Test transition, did things really change?
   if( digitalRead(encoderPinA) != A_set )
   {  // debounce once more
     A_set = !A_set;
     
-      // adjust counter + if A leads B
-    if ( A_set && !B_set )
-      encoderTemp += 1;
-    
+    // adjust counter + if A leads B
+    // and if 200mS since last encoder change has passed
+    if ( A_set && !B_set && (long)(millis() - encoderChangeTime) > 200 )
+    { 
+      encoderTemp++;
+      encoderChangeTime = millis(); // record time encoder value changed
+    }
     rotating = false;  // no more debouncing until loop() hits again
   }
 } //doEncoderA()
@@ -392,14 +415,21 @@ void doEncoderA()
 //*********************************************************************************
 void doEncoderB()
 {
-  if ( rotating ) delay(1);
+  if ( rotating ) 
+  { delay(1); } // wait a little until the bouncing is done
+  
+  // adjust counter + if A leads B
+  // and if 200mS since last encoder change has passed
   if( digitalRead(encoderPinB) != B_set )
   {
     B_set = !B_set;
-      //  adjust counter - 1 if B leads A
-    if( B_set && !A_set )
-      encoderTemp -= 1;
-    
+    //  adjust counter - 1 if B leads A
+    // and if 200mS since last encoder change has passed
+    if( B_set && !A_set && (long)(millis() - encoderChangeTime) > 200 )
+    {
+      encoderTemp--;
+      encoderChangeTime = millis(); // record time encoder value changed
+    }
     rotating = false;
   }
 } //doEncoderB()

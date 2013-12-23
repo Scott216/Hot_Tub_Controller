@@ -11,6 +11,7 @@ bool HotTub::_isHeaterOn;
 int  HotTub::_tempSetpoint;
 int  HotTub::_tempActual;
 byte HotTub::_i2cCmd;
+uint32_t HotTub::_buttonChangeTime;
 
 
 uint32_t _lastI2cTime; // millis() timestamp of most recent I2C communication
@@ -54,6 +55,7 @@ bool HotTub::processButtons()
   if( analogRead(HOT_TUB_BUTTON_INPUT_PIN) < 100 )
   {
     _debounceTimout = millis() + debounceDelay;
+    _buttonChangeTime = millis();  // time button was pressed
     if (isHotTubOn())
     { setHotTubOff(); }
     else
@@ -65,6 +67,7 @@ bool HotTub::processButtons()
   if( digitalRead(JETS_BUTTON_INPUT_PIN) == BTN_ON )
   {
     _debounceTimout = millis() + debounceDelay;
+    _buttonChangeTime = millis();  // time button was pressed
     if (isPumpOn())
     { setPumpOff(); }
     else
@@ -76,10 +79,11 @@ bool HotTub::processButtons()
   if( analogRead(BUBBLER_BUTTON_INPUT_PIN) < 100 )
   {
     _debounceTimout = millis() + debounceDelay;
+    _buttonChangeTime = millis();  // time button was pressed
     if (isBubblerOn())
-    { setBubblerOff(); }
+    { setBubblerOff();}
     else
-    { setBubblerOn(); }
+    { setBubblerOn();}
     return true;
   }
 
@@ -125,7 +129,10 @@ void HotTub::setPumpOn()
 {
   // Only turn pump on if hot tub is on.
   if ( _isHotTubOn )
-  { _isPumpOn = true; }
+  { 
+    _isPumpOn = true; 
+    _pumpStartTime = millis();
+  }
   else
   { _isPumpOn = false; }
 }
@@ -133,6 +140,12 @@ void HotTub::setPumpOn()
 void HotTub::setPumpOff()
 {
   _isPumpOn = false;
+}
+
+// returns millis time when pump was turned on
+uint32_t HotTub::getPumpOnTime()  
+{
+  return _pumpStartTime;
 }
 
 
@@ -145,7 +158,10 @@ void HotTub::setBubblerOn()
 {
   // Only turn bubbler on if hot tub is on
   if ( _isHotTubOn )
-  { _isBubblerOn = true; }
+  { 
+    _isBubblerOn = true; 
+    _bubblerStartTime = millis();
+  }
   else
   { _isBubblerOn = false; }
 }
@@ -153,6 +169,12 @@ void HotTub::setBubblerOn()
 void HotTub::setBubblerOff()
 {
   _isBubblerOn = false;
+}
+
+// returns millis time when bubbler was turned on
+uint32_t HotTub::getBubblerOnTime()  
+{
+  return _bubblerStartTime;
 }
 
 
@@ -224,13 +246,16 @@ void HotTub::i2cReceiveCmd(int bytesReceived)
     switch ( _i2cCmd )
     {
       case ADR_ONOFF_STAT:
-        _isHotTubOn =  i2cBuf[1];
+        if( millis() > _buttonChangeTime + 1000)  // Only accept command from main board if button was pressed more then a second ago
+        { _isHotTubOn =  i2cBuf[1]; }
         break;
       case ADR_PUMP_STAT:
-        _isPumpOn =  i2cBuf[1];
+        if( millis() > _buttonChangeTime + 1000)  // Only accept command from main board if button was pressed more then a second ago
+        { _isPumpOn =  i2cBuf[1]; }
         break;
       case ADR_BUBBLE_STAT:
-        _isBubblerOn =  i2cBuf[1];
+        if( millis() > _buttonChangeTime + 1000)  // Only accept command from main board if button was pressed more then a second ago
+        { _isBubblerOn =  i2cBuf[1]; }
         break;
       case ADR_HEATER_STAT:
         _isHeaterOn =  i2cBuf[1];
