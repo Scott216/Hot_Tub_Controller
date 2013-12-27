@@ -92,7 +92,7 @@ static uint8_t tempSensor[4][8] =
 };
 
 
-// Setup input sensor variables
+// Setup sensor variables
 float tempPreHeat;
 float tempPostHeat;
 float tempPump;
@@ -101,10 +101,10 @@ float pump_amps;
 float heater_amps;
 float bubbler_amps;
 
-bool InputButtonsCurrentState[3];    // Array for Input buttons, current state
-#define BTN_HOT_TUB_ON_OFF   0  // Hot tub On/Off Button
-#define BTN_JETS_ON_OFF      1  // Jests On/Off Button
-#define BTN_BUBBLER_ON_OFF   2  // Bubbler On/Off button
+bool InputButtonsCurrentState[3];    // Array for push-buttons, current state
+#define BTN_HOT_TUB_ON_OFF   0       // Hot tub On/Off Button
+#define BTN_JETS_ON_OFF      1       // Jets On/Off Button
+#define BTN_BUBBLER_ON_OFF   2       // Bubbler On/Off button
 
 
 // Timer Intervals
@@ -122,9 +122,9 @@ uint32_t heater_cooldown_timer =      0; // Timer used to keep pump on for a few
 uint32_t heatOntime;                     // Records time heat was called for in NeedHeat().  Used to keep heat on for a min of 3 minutes
 
 // Alarm setpoints
-const float ALARM_HEATER_AMPS_HIGH = 30.0;
-#define PUMP_AMPS_THRESHOLD       2  // Amps needed verify pump is on
-#define PUMP_PRESSURE_THRESHOLD   5  // Pump pressure (PSI) to verify pump is on
+#define ALARM_HEATER_AMPS_HIGH   30  // Max heater amps allowed
+#define PUMP_AMPS_THRESHOLD       2  // Min amps needed verify pump is on
+#define PUMP_PRESSURE_THRESHOLD   5  // Min PSI needed to verify pump is running
 
 // Define Function Prototypes
 void ReadSensorInputs();
@@ -164,7 +164,8 @@ void setup()
 //============================================================================
 void loop()
 {
-  static uint32_t lastPumpOnTime; // Millis() Timestamp of when pump was last turned on.  Updates every cycle that pump should be on.  Used to keep pump from cycling on/off too fast
+  static uint32_t lastPumpOnTime; // Millis() Timestamp of when pump was last turned on.
+                                  // Updates every cycle that pump should be on.  Used to keep pump from cycling on/off too fast
 
   // Read pushbuttons status and temperature setpoint from user panel
   I2c.write(SLAVE_ID, CMD_ONOFF_BTN);
