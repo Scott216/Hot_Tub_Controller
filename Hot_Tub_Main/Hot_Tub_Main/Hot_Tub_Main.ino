@@ -1,14 +1,3 @@
-/*
-Do you really need heater_cooldown_timer
-When hot tub is about to come on because it needs to heat up, pump sometimes comes on then goes right away.
-Get encoder code from tardis alarm, this one doesn't work well
-
-
-
-Directory:
-	
-
-*/
 
 
 // === Libraries ===
@@ -51,6 +40,12 @@ uint32_t heatOntime;                     // Records time heat was called for in 
 #define ALARM_HEATER_AMPS_HIGH   30  // Max heater amps allowed
 #define PUMP_AMPS_THRESHOLD       2  // Min amps needed verify pump is on
 #define PUMP_PRESSURE_THRESHOLD   5  // Min PSI needed to verify pump is running
+
+
+// Initialize OneWire temp sensors
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature oneWireBus(&oneWire);
+
 
 // Define Function Prototypes
 void ReadSensorInputs();

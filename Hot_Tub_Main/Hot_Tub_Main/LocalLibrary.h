@@ -68,9 +68,9 @@ enum {
   ADR_TEMP_SETPT  = 11
 };
 
-// Initialize OneWire temp sensors
-OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature oneWireBus(&oneWire);
+// link to OneWire temp sensors defined in Hot_Tub_Main.ino 
+extern OneWire oneWire;
+extern DallasTemperature oneWireBus;
 
 static uint8_t tempSensor[4][8] =
 {
