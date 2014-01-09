@@ -11,17 +11,6 @@
 // Create HotTubController instance
 HotTubControl hotTubControl;
 
-// Setup sensor variables
-
-float tempPreHeat;
-float tempPostHeat;
-float tempPump;
-float pressure;
-float pump_amps;
-float heater_amps;
-float bubbler_amps;
-
-
 // Timer Intervals
 #define ALARM_CHECK_INTERVAL       5000  // Check for alarm every 5 seconds
 uint32_t last_alarm_check;
@@ -48,7 +37,6 @@ DallasTemperature oneWireBus(&oneWire);
 
 
 // Define Function Prototypes
-void ReadSensorInputs();
 void CheckAlarms();
 void OutputAlarm(char AlarmText[]);
 void PrintStatus();
@@ -60,13 +48,14 @@ boolean NeedHeat();
 void setup()
 {
   Serial.begin(9600);
-  
 
-
+  // Define output pins
   pinMode(PUMP_ON_OFF_OUTPUT_PIN,    OUTPUT);
   pinMode(HEATER_ON_OFF_OUTPUT_PIN,  OUTPUT);
   pinMode(BUBBLER_ON_OFF_OUTPUT_PIN, OUTPUT);
 
+  // initialize hotTubControl 
+  hotTubControl.begin();
   
   // Initialize timers
   heater_cooldown_timer = 0;
@@ -92,7 +81,7 @@ void loop()
   if ((long)(millis() - last_sensor_check) > SENSOR_CHECK_INTERVAL)
   {
     last_sensor_check = millis();
-    ReadSensorInputs();
+    hotTubControl.refreshSensors();
   }
   
   // Check alarms
@@ -105,7 +94,7 @@ void loop()
   PrintStatus();  // Print for debugging
   
 
-  // Turn off pump         srg - pump sometimes turns off right after turning on
+  // Turn off pump
   // If Hot tub is turned off and cooldown delay has passed, or
   // Jets button is off and we don't need heat, and cooldown delay has passed
   if((hotTubControl.isHotTubBtnOn() == LOW                     && (long)(millis() - heater_cooldown_timer) > 0) ||
@@ -124,7 +113,7 @@ void loop()
      Serial.print("\t");
      Serial.print(NeedHeat());
      Serial.print("\t\t");
-     Serial.print(tempPreHeat);
+     Serial.print(hotTubControl.getTempPreHeat());
      Serial.print("\t");
      Serial.print(digitalRead(HEATER_ON_OFF_OUTPUT_PIN));
      Serial.print("\t");
@@ -156,7 +145,7 @@ void loop()
      Serial.print("\t");
      Serial.print(NeedHeat());
      Serial.print("\t\t");
-     Serial.print(tempPreHeat);     
+     Serial.print(hotTubControl.getTempPreHeat());     
      Serial.print("\t");
      Serial.print(digitalRead(HEATER_ON_OFF_OUTPUT_PIN));
      Serial.print("\t\t");
@@ -173,8 +162,8 @@ void loop()
   // Prerequisites: Hot Tub On + Pump amps and pressure are above threshold + Low water temp + Delay from last time on
   if((hotTubControl.isHotTubBtnOn() == HIGH) &&
      (digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == HIGH) &&
-     (pump_amps >= PUMP_AMPS_THRESHOLD) &&
-     (pressure >= PUMP_PRESSURE_THRESHOLD) &&
+     (hotTubControl.getAmpsPump() >= PUMP_AMPS_THRESHOLD) &&
+     (hotTubControl.getPressure() >= PUMP_PRESSURE_THRESHOLD) &&
      (NeedHeat() == true) &&
      ((long)(millis() - last_heater_on_check) > HEATER_ON_DELAY))
   {
@@ -195,9 +184,9 @@ void loop()
   // Turn off when water temp reaches setpoint or if heater amps is too high or Hot Tub is turned off
   // Or Pump pressure is too low, or pump amps is too low.
   if((NeedHeat() == false) ||
-     (heater_amps >= ALARM_HEATER_AMPS_HIGH) ||
-     (pump_amps < PUMP_AMPS_THRESHOLD) ||
-     (pressure < PUMP_PRESSURE_THRESHOLD) ||
+     (hotTubControl.getAmpsHeater() >= ALARM_HEATER_AMPS_HIGH) ||
+     (hotTubControl.getAmpsPump() < PUMP_AMPS_THRESHOLD) ||
+     (hotTubControl.getPressure() < PUMP_PRESSURE_THRESHOLD) ||
      (hotTubControl.isHotTubBtnOn() == LOW))
   {
     digitalWrite(HEATER_ON_OFF_OUTPUT_PIN, LOW);
@@ -219,98 +208,13 @@ void loop()
     digitalWrite(BUBBLER_ON_OFF_OUTPUT_PIN, LOW);
   }
 
-  // Update user panel with hot tub info: Water temp, Hot 
-  hotTubControl.writePanelStatus( tempPreHeat,  digitalRead(PUMP_ON_OFF_OUTPUT_PIN),  digitalRead(BUBBLER_ON_OFF_OUTPUT_PIN),  digitalRead(HEATER_ON_OFF_OUTPUT_PIN) );
+  // Update user panel with hot tub info: Water temp, Motor on/off state
+  hotTubControl.writePanelStatus( hotTubControl.getTempPreHeat(),
+                                  digitalRead(PUMP_ON_OFF_OUTPUT_PIN),
+                                  digitalRead(BUBBLER_ON_OFF_OUTPUT_PIN),
+                                  digitalRead(HEATER_ON_OFF_OUTPUT_PIN) );
 
 }  // loop()
-
-
-
-//*********************************************************************************
-// Read Amps, Temperatures and pressure
-// Take 25 samples then take average
-//*********************************************************************************
-void ReadSensorInputs()
-{
-/*
-  // Get temperatures from Thermocouples
-  // I didn't put in loop because reading temps is kind of slow
-  // Determine which sensor to take measurement from
-  float validTemp;
-  float PreHeaterTemp1;
-  float PreHeaterTemp2;
-  oneWireBus.requestTemperatures();   // Send the command to get temperatures
-  validTemp = oneWireBus.getTempF(&tempSensor[0][0]);
-  if (validTemp > 40)
-  { PreHeaterTemp1 = validTemp; }
-  
-  validTemp = oneWireBus.getTempF(&tempSensor[1][0]);
-  if (validTemp > 40)
-  { PreHeaterTemp2 = validTemp; }
-  
-  validTemp = oneWireBus.getTempF(&tempSensor[2][0]);
-  if (validTemp > 40)
-  { tempPostHeat = validTemp; }
-  
-  validTemp = oneWireBus.getTempF(&tempSensor[3][0]);
-  if (validTemp > 40)
-  { tempPump = validTemp; }
-
-  if(abs(PreHeaterTemp1 - PreHeaterTemp2) < 4)
-  {
-    // Two probes are relatively close, just take the average for the temp
-    tempPreHeat =  (PreHeaterTemp1 + PreHeaterTemp2) / 2;
-  }
-  else if(PreHeaterTemp1 > PreHeaterTemp2)    // Temp probes are not very close, choose higher one so heater doesn't stay on all the time
-  { tempPreHeat =  PreHeaterTemp1; }
-  else
-  { tempPreHeat = PreHeaterTemp2; }
-  
-  
-  // Take multiple samples and get average
-  // Initialize variables
-  pump_amps =    0.0;
-  heater_amps =  0.0;
-  bubbler_amps = 0.0;
-  pressure =     0.0;
-  int samples;
-  
-  for (samples = 0; samples < 25; samples++)
-  {
-    // Get Amps from CTs
-    pump_amps    += analogRead(CT_PUMP);  // ADC value for pump is about 630
-    heater_amps  += (analogRead(CT_HEATER1) + analogRead(CT_HEATER2))/2.0;  // There are 2 CTs for the heater, take average.  Each one should read about 22.8 amps
-    bubbler_amps += analogRead(CT_BUBBLER);
-    pressure += analogRead(PRESSURE_GAUGE);   // Get Pressure.  30 PSI Max, 4-20mA output
-    delay(1);
-  }
-  
-  // Calculate averages from samples
-  pump_amps =    (pump_amps    / (float) samples) * (20.0 / 1024.0) - 1.3;    // 20 Amp CT, -1.3 calibration offset
-  heater_amps =  (heater_amps  / (float) samples) * (50.0 / 1024.0) - 4.75;   // 50 Amp CTs, -4.75 amps calibration offset
-  bubbler_amps = (bubbler_amps / (float) samples) * (20.0 / 1024.0) - 1.0;    // 20 Amp CTs, -1.0 amp calibration offset
-  pressure =     (pressure     / (float) samples) * 0.0377 - 7.5094 + 0.25;   // 0.25 PSI calibration offset
-  // If values are close to zero, then set to zero
-  if (pump_amps    < 1.0) pump_amps =    0.0;
-  if (heater_amps  < 1.0) heater_amps =  0.0;
-  if (bubbler_amps < 0.5) bubbler_amps = 0.0;
-  if (pressure     < 2.0) pressure =     0.0;
-
-*/
-  
-/*
-  // SRG dummy data when not connected to main controller board
-  tempPostHeat = 110;
-  tempPump = 150;
-  tempPreHeat = 98;
-  pump_amps = 9.0;
-  heater_amps = 22.0;
-  bubbler_amps = 5.0;
-  pressure = 15.0;
-*/
-
-
-}  // ReadSensorInputs()
 
 
 
@@ -322,7 +226,7 @@ boolean NeedHeat()
 { 
   if(digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == HIGH)
   { // heater is on
-    if (tempPreHeat > (float) hotTubControl.getTempSetpoint() + 0.4 )  // temperature has reached setpoint, don't need heat anymore
+    if (hotTubControl.getTempPreHeat() > (float) hotTubControl.getTempSetpoint() + 0.4 )  // temperature has reached setpoint, don't need heat anymore
     {
       // If heater was just turned on, then don't turn off until 3 minutes has passed
       if ( (long)(millis() - heatOntime) > 3UL * 60000UL )
@@ -340,7 +244,7 @@ Serial.print("Heater Off.  Millis - heatOntime = "); Serial.println( (long)(mill
   }
   else // heater is off
   { 
-    if (tempPreHeat < (float) hotTubControl.getTempSetpoint() - 0.4 )  // Turn on heater if it's 0.8 degree below setpoint
+    if (hotTubControl.getTempPreHeat() < (float) hotTubControl.getTempSetpoint() - 0.4 )  // Turn on heater if it's 0.8 degree below setpoint
     {
       heatOntime = millis(); // Heater was off and it needs to be turned on.  Record heater on time
       return true;
@@ -377,65 +281,65 @@ void CheckAlarms()
   char txtAlarm[75];
   
   // High water temp, pre-heater
-  if ( tempPreHeat > 120 )
+  if ( hotTubControl.getTempPreHeat() > 120 )
   {
-    sprintf_P(txtAlarm, PSTR("High pre-heater temperature = %d degrees"), (int) tempPreHeat );
+    sprintf_P(txtAlarm, PSTR("High pre-heater temperature = %d degrees"), (int) hotTubControl.getTempPreHeat() );
     OutputAlarm(txtAlarm);
   }
   
   // high water temp, post heater
-  if (  tempPostHeat > 150 )
+  if (  hotTubControl.getTempPostHeat() > 150 )
   {
-    sprintf_P(txtAlarm, PSTR("High post-heater temperature = %d degrees"), (int) tempPostHeat );
+    sprintf_P(txtAlarm, PSTR("High post-heater temperature = %d degrees"), (int) hotTubControl.getTempPostHeat() );
     OutputAlarm(txtAlarm);
   }
   
   // Pump housing high temperature
-  if ( tempPump > 150 )
+  if ( hotTubControl.getTempPump() > 150 )
   {
-    sprintf_P(txtAlarm, PSTR("High pump housing temperature = %d degrees"), (int) tempPump );
+    sprintf_P(txtAlarm, PSTR("High pump housing temperature = %d degrees"), (int) hotTubControl.getTempPump() );
     OutputAlarm(txtAlarm);
   }
   
   // Low temp alarm
-  if ( tempPreHeat < 50 )
+  if ( hotTubControl.getTempPreHeat() < 50 )
   {
-    sprintf_P(txtAlarm, PSTR("Low pre-heater temperature = %d degrees"), (int) tempPreHeat );
+    sprintf_P(txtAlarm, PSTR("Low pre-heater temperature = %d degrees"), (int) hotTubControl.getTempPreHeat() );
     OutputAlarm(txtAlarm);
   }
   
   // High pressure alarm
-  if ( pressure > 20.0 )
+  if ( hotTubControl.getPressure() > 20.0 )
   {
-    sprintf_P(txtAlarm, PSTR("High pressure alarm, pressure = %d PSI"), (int) pressure );
+    sprintf_P(txtAlarm, PSTR("High pressure alarm, pressure = %d PSI"), (int) hotTubControl.getPressure() );
     OutputAlarm(txtAlarm);
   }
   
   // High Pump Amps alarm
-  if ( pump_amps > 18.0 )
+  if ( hotTubControl.getAmpsPump() > 18.0 )
   {
-    sprintf_P(txtAlarm, PSTR("High pump amps alarm = %d amps"), (int) pump_amps );
+    sprintf_P(txtAlarm, PSTR("High pump amps alarm = %d amps"), (int) hotTubControl.getAmpsPump() );
     OutputAlarm(txtAlarm);
   }
   
   // Pump on but pressure is low.  Will need delay after pump is first turned on before you check for alarm
-  if ( (pressure < 5.0) && (digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == HIGH) )
+  if ( (hotTubControl.getPressure() < 5.0) && (digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == HIGH) )
   {
-    sprintf_P(txtAlarm, PSTR("Low pressure alarm while pump is on, pressure = %d PSI"), (int) pressure );
+    sprintf_P(txtAlarm, PSTR("Low pressure alarm while pump is on, pressure = %d PSI"), (int) hotTubControl.getPressure() );
     OutputAlarm(txtAlarm);
   }
   
   // High heater amps
-  if ( heater_amps > ALARM_HEATER_AMPS_HIGH )
+  if ( hotTubControl.getAmpsHeater() > ALARM_HEATER_AMPS_HIGH )
   {
-    sprintf_P(txtAlarm, PSTR("High heater amps = %d"), (int) heater_amps );
+    sprintf_P(txtAlarm, PSTR("High heater amps = %d"), (int) hotTubControl.getAmpsHeater() );
     OutputAlarm(txtAlarm);
   }
   
   // Low heater amps
-  if ( (heater_amps < 15) && (digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == HIGH) )
+  if ( (hotTubControl.getAmpsHeater() < 15) && (digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == HIGH) )
   {
-    sprintf_P(txtAlarm, PSTR("Low heater amps while heater is on = %d amps"), (int) heater_amps );
+    sprintf_P(txtAlarm, PSTR("Low heater amps while heater is on = %d amps"), (int) hotTubControl.getAmpsHeater() );
     OutputAlarm(txtAlarm);
   }
   
@@ -487,7 +391,7 @@ void PrintStatus()
     Serial.print(NeedHeat());
     Serial.print(F("\t"));
 
-    Serial.print(tempPreHeat);
+    Serial.print(hotTubControl.getTempPreHeat());
     Serial.print(F("\t"));
 
     Serial.print(hotTubControl.getTempSetpoint());
@@ -497,19 +401,19 @@ void PrintStatus()
     Serial.print(digitalRead(BUBBLER_ON_OFF_OUTPUT_PIN));
     Serial.print(F("\t"));
 
-    Serial.print(tempPreHeat);
+    Serial.print(hotTubControl.getTempPreHeat());
     Serial.print(F("\t"));
-    Serial.print(tempPostHeat);
+    Serial.print(hotTubControl.getTempPostHeat());
     Serial.print(F("\t"));
-    Serial.print(tempPump);
+    Serial.print(hotTubControl.getTempPump());
     Serial.print(F("\t"));
-    Serial.print(pressure);
+    Serial.print(hotTubControl.getPressure());
     Serial.print(F("\t"));
-    Serial.print(heater_amps);
+    Serial.print(hotTubControl.getAmpsHeater());
     Serial.print(F("\t"));
-    Serial.print(pump_amps);
+    Serial.print(hotTubControl.getAmpsPump());
     Serial.print(F("\t"));
-    Serial.print(bubbler_amps);
+    Serial.print(hotTubControl.getAmpsBubbler());
     Serial.print(F("\t"));
     Serial.print((millis() - heatOntime)/1000UL);
     
@@ -539,19 +443,19 @@ void PrintStatus()
      }
      cntHeading++;
      
-     Serial.print(tempPreHeat);
+     Serial.print(hotTubControl.getTempPreHeat());
      Serial.print("\t");
-     Serial.print(tempPostHeat);
+     Serial.print(hotTubControl.getTempPostHeat());
      Serial.print("\t");
-     Serial.print(tempPump);
+     Serial.print(hotTubControl.getTempPump());
      Serial.print("\t");
-     Serial.print(pressure);
+     Serial.print(hotTubControl.getPressure());
      Serial.print("\t");
-     Serial.print(heater_amps);
+     Serial.print(hotTubControl.getAmpsHeater());
      Serial.print("\t");
-     Serial.print(pump_amps);
+     Serial.print(hotTubControl.getAmpsPump());
      Serial.print("\t");
-     Serial.print(bubbler_amps);
+     Serial.print(hotTubControl.getAmpsBubbler());
      Serial.println();
 */
 
