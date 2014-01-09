@@ -13,69 +13,17 @@ Directory:
 
 // === Libraries ===
 #include "Arduino.h"
-#include <OneWire.h>    // http://www.pjrc.com/teensy/td_libs_OneWire.html  http://playground.arduino.cc/Learning/OneWire
+#include <OneWire.h>           // http://www.pjrc.com/teensy/td_libs_OneWire.html  http://playground.arduino.cc/Learning/OneWire
 #include <DallasTemperature.h> // http://milesburton.com/index.php?title=Dallas_Temperature_Control_Library
-#include "I2C.h"  // use for I2C communication  http://dsscircuits.com/articles/arduino-i2c-master-library.html
+#include <I2C.h>               // use for I2C communication  http://dsscircuits.com/articles/arduino-i2c-master-library.html
 #include "LocalLibrary.h"
 
-#define MEGA  // set this if using an Arduino Mega
-// #define PANSTAMP // set this if using Panstamp
-
-
-
-// Define I/0 Pins
-#ifdef MEGA
-  //=== Analog Inputs for CTs measuring current ===
-  #define CT_PUMP       8  // Pump amps input 20 Amp CT
-  #define CT_HEATER1    9  // Heater leg 1 amps, 50 Amp CT
-  #define CT_HEATER2   10  // Heater leg 2 amps, 50 Amp CT
-  #define CT_BUBBLER   11  // Bubbler amps, 20 Amp CT
-  
-  //===Analog Inputs from Pressure===
-  #define PRESSURE_GAUGE 12  // Pressure, comes from 4-20mA gauge
-  
-  //=== Output for Solid State Relays ===
-  #define PUMP_ON_OFF_OUTPUT_PIN     11
-  #define HEATER_ON_OFF_OUTPUT_PIN    9
-  #define BUBBLER_ON_OFF_OUTPUT_PIN   8
-  
-  #define ONE_WIRE_BUS 37 // OneWire data pin
-#endif
-
-#ifdef PANSTAMP
-  //=== Analog Inputs for CTs measuring current ===
-  #define CT_PUMP       0  // Pump amps input 20 Amp CT
-  #define CT_HEATER1    1  // Heater leg 1 amps, 50 Amp CT
-  #define CT_HEATER2    2  // Heater leg 2 amps, 50 Amp CT
-  #define CT_BUBBLER    3  // Bubbler amps, 20 Amp CT
-  
-  //===Analog Inputs from Pressure===
-  #define PRESSURE_GAUGE 6  // Pressure, comes from 4-20mA gauge
-  
-  //=== Output for Solid State Relays ===
-  #define PUMP_ON_OFF_OUTPUT_PIN      3
-  #define HEATER_ON_OFF_OUTPUT_PIN    4
-  #define BUBBLER_ON_OFF_OUTPUT_PIN   5
-  
-  #define ONE_WIRE_BUS 6 // OneWire data pin
-#endif
-
-
-// Initialize OneWire temp sensors
-OneWire oneWire(ONE_WIRE_BUS); 
-DallasTemperature oneWireBus(&oneWire);
-static uint8_t tempSensor[4][8] =
-{
-  { 0x28, 0x0A, 0x48, 0x00, 0x05, 0x00, 0x00, 0x33 },  // pre heater temp sensor 1, lower sensor
-  { 0x10, 0x33, 0x71, 0x6A, 0x02, 0x08, 0x00, 0x5D },  // pre heater temp sensor 2, upper sensor
-  { 0x28, 0x20, 0xCE, 0xB3, 0x04, 0x00, 0x00, 0xAF },  // post heater temp sensor
-  { 0x28, 0x1F, 0xA2, 0xB2, 0x04, 0x00, 0x00, 0xD9 }   // Pump temp
-};
 
 // Create HotTubController instance
 HotTubControl hotTubControl;
 
 // Setup sensor variables
+
 float tempPreHeat;
 float tempPostHeat;
 float tempPump;
@@ -118,7 +66,6 @@ void setup()
 {
   Serial.begin(9600);
   
-  oneWireBus.begin(); // Initialize OneWire
 
 
   pinMode(PUMP_ON_OFF_OUTPUT_PIN,    OUTPUT);
@@ -290,6 +237,7 @@ void loop()
 //*********************************************************************************
 void ReadSensorInputs()
 {
+/*
   // Get temperatures from Thermocouples
   // I didn't put in loop because reading temps is kind of slow
   // Determine which sensor to take measurement from
@@ -353,6 +301,8 @@ void ReadSensorInputs()
   if (bubbler_amps < 0.5) bubbler_amps = 0.0;
   if (pressure     < 2.0) pressure =     0.0;
 
+*/
+  
 /*
   // SRG dummy data when not connected to main controller board
   tempPostHeat = 110;
@@ -363,6 +313,7 @@ void ReadSensorInputs()
   bubbler_amps = 5.0;
   pressure = 15.0;
 */
+
 
 }  // ReadSensorInputs()
 

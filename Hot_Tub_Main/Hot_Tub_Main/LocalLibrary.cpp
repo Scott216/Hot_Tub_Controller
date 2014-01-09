@@ -1,4 +1,3 @@
-
 #include "LocalLibrary.h"
 
 
@@ -8,7 +7,6 @@ HotTubControl::HotTubControl()
 
 HotTubControl::~HotTubControl()
 {
-
 }
 
 
@@ -19,7 +17,7 @@ void HotTubControl::begin()
   I2c.pullup(0); // turn off internal pullups (doesn't do anything on mega)
   I2c.timeOut(30000); // 30 second timeout
 
-
+  oneWireBus.begin(); // Initialize OneWire
 }
 
 void HotTubControl::readPanelStatus()
@@ -71,49 +69,148 @@ void HotTubControl::writePanelStatus(float currentTemp, bool pumpState, bool bub
 void HotTubControl::refreshSensors()
 {
 
+  readTemperature();
+  readPressure();
+  readAmps();
+
+  /*
+   // SRG dummy data when not connected to main controller board
+   _tempPreheat =   98;
+   _tempPostHeat = 110;
+   _tempPump =     150;
+   _ampsPump =     9.0;
+   _ampsHeater =  22.0;
+   _ampsBubbler =  5.0;
+   _Pressure =    15.0;
+   */
+
+} // refreshSensors()
+
+
+// Get temperatures from 1-wire sensors
+void HotTubControl::readTemperature()
+{
+  // Determine which sensor to take measurement from
+  float validTemp;
+  float PreHeaterTemp1;
+  float PreHeaterTemp2;
+  oneWireBus.requestTemperatures();   // Send the command to get temperatures
+  validTemp = oneWireBus.getTempF(&tempSensor[0][0]);
+  if (validTemp > 40)
+  { PreHeaterTemp1 = validTemp; }
+
+  validTemp = oneWireBus.getTempF(&tempSensor[1][0]);
+  if (validTemp > 40)
+  { PreHeaterTemp2 = validTemp; }
+
+  validTemp = oneWireBus.getTempF(&tempSensor[2][0]);
+  if (validTemp > 40)
+  { _tempPostHeat = validTemp; }
+
+  validTemp = oneWireBus.getTempF(&tempSensor[3][0]);
+  if (validTemp > 40)
+  { _tempPump = validTemp; }
+
+  if(abs(PreHeaterTemp1 - PreHeaterTemp2) < 4)
+  {
+    // Two probes are relatively close, just take the average for the temp
+    _tempPreheat =  (PreHeaterTemp1 + PreHeaterTemp2) / 2;
+  }
+  else if(PreHeaterTemp1 > PreHeaterTemp2)    // Temp probes are not very close, choose higher one so heater doesn't stay on all the time
+  { _tempPreheat =  PreHeaterTemp1; }
+  else
+  { _tempPreheat = PreHeaterTemp2; }
   
+} // readTemperature()
+
+
+// Read pressure gauge
+void HotTubControl::readPressure()
+{
+  float pressure = 0.0;
+  int samples;
+
+  for (samples = 0; samples < 25; samples++)
+  {
+    pressure += analogRead(PRESSURE_GAUGE);   // Get Pressure.  30 PSI Max, 4-20mA output
+    delay(1);
+  }
+
+  // Calculate averages from samples
+  _Pressure = ( pressure / (float)samples ) * 0.0377 - 7.5094 + 0.25;   // 0.25 PSI calibration offset
+
+  // If values are close to zero, then set to zero
+  if (_Pressure < 2.0) pressure = 0.0;
+  
+} // readPressure()
+
+
+
+// Read amps sensors
+void HotTubControl::readAmps()
+{
+  // Take multiple samples and get average
+  // Initialize variables
+  float pump_amps =    0.0;
+  float heater_amps =  0.0;
+  float bubbler_amps = 0.0;
+  int samples;
+
+  for (samples = 0; samples < 25; samples++)
+  {
+    // Get Amps from CTs
+    pump_amps    += analogRead(CT_PUMP);  // ADC value for pump is about 630
+    heater_amps  += (analogRead(CT_HEATER1) + analogRead(CT_HEATER2)) / 2.0;  // There are 2 CTs for the heater, take average.  Each one should read about 22.8 amps
+    bubbler_amps += analogRead(CT_BUBBLER);
+    delay(1);
+  }
+
+  // Calculate averages from samples
+  _ampsPump =    (pump_amps    / (float) samples) * (20.0 / 1024.0) - 1.3;    // 20 Amp CT,  -1.30 amps calibration offset
+  _ampsHeater =  (heater_amps  / (float) samples) * (50.0 / 1024.0) - 4.75;   // 50 Amp CTs, -4.75 amps calibration offset
+  _ampsBubbler = (bubbler_amps / (float) samples) * (20.0 / 1024.0) - 1.0;    // 20 Amp CTs, -1.00 amps calibration offset
+  // If values are close to zero, then set to zero
+  if (_ampsPump    < 1.0) _ampsPump =    0.0;
+  if (_ampsHeater  < 1.0) _ampsHeater =  0.0;
+  if (_ampsBubbler < 0.5) _ampsBubbler = 0.0;
+  
+} // readAmps()
+
+
+float HotTubControl::getTempPreHeat()
+{
+  return _tempPreheat;
 }
 
-
-// Determine if hot tub heaters should come on
-// If heater is already on, heat it up to setpoint + 0.8 degrees
-// If heater is off, turn it on when temp drops to setpoint - 0.8 degree
-// Once heat is called for, keep it on for at least 3 minutes
-bool HotTubControl::needHeatt()
+float HotTubControl::getTempPostHeat()
 {
-/*
-  if(digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == HIGH)
-  { // heater is on
-    if (tempPreHeat > (float) Temperature_Setpoint + 0.4 )  // temperature has reached setpoint, don't need heat anymore
-    {
-      // If heater was just turned on, then don't turn off until 3 minutes has passed
-      if ( (long)(millis() - heatOntime) > 3UL * 60000UL )
-      {
-        // 3 mintues has passed, okay to turn off
-        heatOntime = 0;
-        return false;
-      }
-      else
-      { return true; }  // 3 minutes has not passed, keep heat on
-    }
-    else // temperature is below setpoint, call for heat
-    { return true; }
-  }
-  else // heater is off
-  {
-    if (tempPreHeat < (float) Temperature_Setpoint - 0.4 )  // Turn on heater if it's 0.8 degree below setpoint
-    {
-      heatOntime = millis(); // Heater was off and it needs to be turned on.  Record heater on time
-      return true;
-    }
-    else
-    {
-      return false;
-    }
-  }
-*/
-} // End needHeat()
+  return _tempPostHeat;
+}
 
+float HotTubControl::getTempPump()
+{
+  return _tempPump;
+}
+
+float HotTubControl::getPressure()
+{
+  return _Pressure;
+}
+
+float HotTubControl::getAmpsPump()
+{
+  return _ampsPump;
+}
+
+float HotTubControl::getAmpsHeater()
+{
+  return _ampsHeater;
+}
+
+float HotTubControl::getAmpsBubbler()
+{
+  return _ampsBubbler;
+}
 
 
 // Returns state of On/Off pushbutton on control panel

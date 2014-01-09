@@ -1,13 +1,57 @@
-
-
 #ifndef Hot_Tub_Controller_LocalLibrary_h
 #define Hot_Tub_Controller_LocalLibrary_h
+
 #include <Arduino.h>
-#include "I2C.h"  // use for I2C communication  http://dsscircuits.com/articles/arduino-i2c-master-library.html
+#include <OneWire.h>           // http://www.pjrc.com/teensy/td_libs_OneWire.html  http://playground.arduino.cc/Learning/OneWire
+#include <DallasTemperature.h> // http://milesburton.com/index.php?title=Dallas_Temperature_Control_Library
+#include <I2C.h>               // use for I2C communication  http://dsscircuits.com/articles/arduino-i2c-master-library.html
+
 
 #define SLAVE_ID     46 // I2C address of LED backpack on user panel
 #define I2C_SUCCESS   0 // When I2C read/writes are sucessful, function returns 0
 #define MAX_I2C_BYTES 6 // Max I2C bytes to send data to slave
+
+
+#define MEGA  // set this if using an Arduino Mega
+// #define PANSTAMP // set this if using Panstamp
+
+// Define I/0 Pins
+#ifdef MEGA
+//=== Analog Inputs for CTs measuring current ===
+#define CT_PUMP       8  // Pump amps input 20 Amp CT
+#define CT_HEATER1    9  // Heater leg 1 amps, 50 Amp CT
+#define CT_HEATER2   10  // Heater leg 2 amps, 50 Amp CT
+#define CT_BUBBLER   11  // Bubbler amps, 20 Amp CT
+
+//===Analog Inputs from Pressure===
+#define PRESSURE_GAUGE 12  // Pressure, comes from 4-20mA gauge
+
+//=== Output pins for motor relays ===
+#define PUMP_ON_OFF_OUTPUT_PIN     11
+#define HEATER_ON_OFF_OUTPUT_PIN    9
+#define BUBBLER_ON_OFF_OUTPUT_PIN   8
+
+#define ONE_WIRE_BUS 37 // OneWire data pin
+#endif
+
+#ifdef PANSTAMP
+//=== Analog Inputs for CTs measuring current ===
+#define CT_PUMP       0  // Pump amps input 20 Amp CT
+#define CT_HEATER1    1  // Heater leg 1 amps, 50 Amp CT
+#define CT_HEATER2    2  // Heater leg 2 amps, 50 Amp CT
+#define CT_BUBBLER    3  // Bubbler amps, 20 Amp CT
+
+//===Analog Inputs from Pressure===
+#define PRESSURE_GAUGE 6  // Pressure, comes from 4-20mA gauge
+
+//=== Output pins for motor relays ===
+#define PUMP_ON_OFF_OUTPUT_PIN      3
+#define HEATER_ON_OFF_OUTPUT_PIN    4
+#define BUBBLER_ON_OFF_OUTPUT_PIN   5
+
+#define ONE_WIRE_BUS 6 // OneWire data pin
+#endif
+
 
 // I2C Commands to read data from LED backpack user panel
 enum {
@@ -24,6 +68,18 @@ enum {
   ADR_TEMP_SETPT  = 11
 };
 
+// Initialize OneWire temp sensors
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature oneWireBus(&oneWire);
+
+static uint8_t tempSensor[4][8] =
+{
+  { 0x28, 0x0A, 0x48, 0x00, 0x05, 0x00, 0x00, 0x33 },  // pre heater temp sensor 1, lower sensor
+  { 0x10, 0x33, 0x71, 0x6A, 0x02, 0x08, 0x00, 0x5D },  // pre heater temp sensor 2, upper sensor
+  { 0x28, 0x20, 0xCE, 0xB3, 0x04, 0x00, 0x00, 0xAF },  // post heater temp sensor
+  { 0x28, 0x1F, 0xA2, 0xB2, 0x04, 0x00, 0x00, 0xD9 }   // Pump temp
+};
+
 
 class HotTubControl
 {
@@ -33,12 +89,18 @@ public:
   void begin();
   void readPanelStatus();  // Read status of control panel via I2C
   void writePanelStatus(float currentTemp, bool pumpState, bool bubbleState, bool heatState); // Send update to panel
-  bool needHeatt();        // True if need heat
   void refreshSensors();   // Read temp, pressure, amp sensors
   bool isHotTubBtnOn();    // Returns state of On/Off button on control panel
   bool isPumpBtnOn();      // Returns state of Pump button on control panel
   bool isBubbleBtnOn();    // Returns state of Bubble button on control panel
   byte getTempSetpoint();  // returns the setpoint temp
+  float getTempPreHeat();
+  float getTempPostHeat();
+  float getTempPump();
+  float getPressure();
+  float getAmpsPump();
+  float getAmpsHeater();
+  float getAmpsBubbler();
   
 
 private:
@@ -47,8 +109,17 @@ private:
   bool _pumpBtn;
   bool _bubbleBtn;
   byte _targetTemp;
+  float _tempPreheat;
+  float _tempPostHeat;
+  float _tempPump;
+  float _Pressure;
+  float _ampsHeater;
+  float _ampsPump;
+  float _ampsBubbler;
+  void readTemperature();
+  void readPressure();
+  void readAmps();
   
-
 };
 
 #endif
