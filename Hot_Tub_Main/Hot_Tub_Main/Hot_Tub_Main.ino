@@ -21,24 +21,7 @@ Directory:
 #define MEGA  // set this if using an Arduino Mega
 // #define PANSTAMP // set this if using Panstamp
 
-#define SLAVE_ID     46 // I2C address of LED backpack on user panel
-#define I2C_SUCCESS   0 // When I2C read/writes are sucessful, function returns 0
-#define MAX_I2C_BYTES 6 // Max I2C bytes to send data to slave
 
-// I2C Commands to read data from LED backpack user panel
-enum {
-  CMD_SAVE_ALL    =  1,  // writes all data from Mater to slave
-  CMD_SLAVE_ID    =  2,
-  CMD_ONOFF_BTN   =  3,
-  CMD_PUMP_BTN    =  4,
-  CMD_BUBBLE_BTN  =  5,
-  CMD_TEMP_SETPT  =  6,
-  ADR_ONOFF_STAT  =  7, // Addresses to save data to slave
-  ADR_PUMP_STAT   =  8,
-  ADR_BUBBLE_STAT =  9,
-  ADR_HEATER_STAT = 10,
-  ADR_TEMP_SETPT  = 11
-};
 
 // Define I/0 Pins
 #ifdef MEGA
@@ -77,8 +60,6 @@ enum {
   #define ONE_WIRE_BUS 6 // OneWire data pin
 #endif
 
-int Temperature_Setpoint = 100;  // Initial setpoint
-
 
 // Initialize OneWire temp sensors
 OneWire oneWire(ONE_WIRE_BUS); 
@@ -91,6 +72,8 @@ static uint8_t tempSensor[4][8] =
   { 0x28, 0x1F, 0xA2, 0xB2, 0x04, 0x00, 0x00, 0xD9 }   // Pump temp
 };
 
+// Create HotTubController instance
+HotTubControl hotTubControl;
 
 // Setup sensor variables
 float tempPreHeat;
@@ -100,11 +83,6 @@ float pressure;
 float pump_amps;
 float heater_amps;
 float bubbler_amps;
-
-bool InputButtonsCurrentState[3];    // Array for push-buttons, current state
-#define BTN_HOT_TUB_ON_OFF   0       // Hot tub On/Off Button
-#define BTN_JETS_ON_OFF      1       // Jets On/Off Button
-#define BTN_BUBBLER_ON_OFF   2       // Bubbler On/Off button
 
 
 // Timer Intervals
@@ -142,9 +120,6 @@ void setup()
   
   oneWireBus.begin(); // Initialize OneWire
 
-  I2c.begin();  // Initialize I2C
-  I2c.pullup(0); // turn off internal pullups (doesn't do anything on mega)
-  I2c.timeOut(30000); // 30 second timeout
 
   pinMode(PUMP_ON_OFF_OUTPUT_PIN,    OUTPUT);
   pinMode(HEATER_ON_OFF_OUTPUT_PIN,  OUTPUT);
@@ -168,26 +143,9 @@ void loop()
                                   // Updates every cycle that pump should be on.  Used to keep pump from cycling on/off too fast
 
   // Read pushbuttons status and temperature setpoint from user panel
-  I2c.write(SLAVE_ID, CMD_ONOFF_BTN);
-  delay(1);
-  I2c.read(SLAVE_ID, 1);                                           // request on/off button status
-  InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] = I2c.receive();    // Read the on/off button status from slave
+  hotTubControl.readPanelStatus();
 
-  I2c.write(SLAVE_ID, CMD_PUMP_BTN);
-  delay(1);
-  I2c.read(SLAVE_ID, 1);               
-  InputButtonsCurrentState[BTN_JETS_ON_OFF] = I2c.receive();      
-
-  I2c.write(SLAVE_ID, CMD_BUBBLE_BTN);  
-  delay(1);
-  I2c.read(SLAVE_ID, 1);
-  InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] = I2c.receive();
-
-  I2c.write(SLAVE_ID, CMD_TEMP_SETPT);
-  delay(1);
-  I2c.read(SLAVE_ID, 1);
-  Temperature_Setpoint = I2c.receive();
- 
+  
   // Check sensor inputs
   if ((long)(millis() - last_sensor_check) > SENSOR_CHECK_INTERVAL)
   {
@@ -208,8 +166,8 @@ void loop()
   // Turn off pump         srg - pump sometimes turns off right after turning on
   // If Hot tub is turned off and cooldown delay has passed, or
   // Jets button is off and we don't need heat, and cooldown delay has passed
-  if((InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] == LOW                     && (long)(millis() - heater_cooldown_timer) > 0) ||
-     (InputButtonsCurrentState[BTN_JETS_ON_OFF] == LOW && NeedHeat() == false && (long)(millis() - heater_cooldown_timer) > 0) )
+  if((hotTubControl.isHotTubBtnOn() == LOW                     && (long)(millis() - heater_cooldown_timer) > 0) ||
+     (hotTubControl.isPumpBtnOn() == LOW && NeedHeat() == false && (long)(millis() - heater_cooldown_timer) > 0) )
   {
     // srg debug
     // Print values so you can see why pump is turned off
@@ -218,9 +176,9 @@ void loop()
      Serial.println("Turning Pump Off");
      Serial.println("OnOff BTN\tJetsBtn\tNeedHeat()\ttemp\theater\ttimer\tCooldown");
      Serial.print("   ");
-     Serial.print(InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF]);
+     Serial.print(hotTubControl.isHotTubBtnOn());
      Serial.print("\t\t");
-     Serial.print(InputButtonsCurrentState[BTN_JETS_ON_OFF]);
+     Serial.print(hotTubControl.isPumpBtnOn());
      Serial.print("\t");
      Serial.print(NeedHeat());
      Serial.print("\t\t");
@@ -239,8 +197,8 @@ void loop()
   
   // Turn on pump
   // Pump is turned on either by manually by pushbutton or by the heater
-  if((InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] == HIGH) &&                          // Hot tub must be on
-     ((InputButtonsCurrentState[BTN_JETS_ON_OFF] == HIGH) || (NeedHeat() == true)) &&   // Pushbutton OR Need heat
+  if((hotTubControl.isHotTubBtnOn() == HIGH) &&                          // Hot tub must be on
+     ((hotTubControl.isPumpBtnOn() == HIGH) || (NeedHeat() == true)) &&   // Pushbutton OR Need heat
      ((long)(millis() - lastPumpOnTime) > PUMP_ON_DELAY))                           // Delay before pump can be turned on again after being off, prevents fast cycling if there is a problem
   {
     // srg debug
@@ -250,9 +208,9 @@ void loop()
      Serial.println("Turning Pump On");
      Serial.println("OnOff BTN\tJetsBtn\tNeedHeat()\ttemp\theater\tLastPumpCheck");
      Serial.print("   ");
-     Serial.print(InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF]);
+     Serial.print(hotTubControl.isHotTubBtnOn());
      Serial.print("\t\t");
-     Serial.print(InputButtonsCurrentState[BTN_JETS_ON_OFF]);
+     Serial.print(hotTubControl.isPumpBtnOn());
      Serial.print("\t");
      Serial.print(NeedHeat());
      Serial.print("\t\t");
@@ -271,7 +229,7 @@ void loop()
   
   // Turn on heater
   // Prerequisites: Hot Tub On + Pump amps and pressure are above threshold + Low water temp + Delay from last time on
-  if((InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] == HIGH) &&
+  if((hotTubControl.isHotTubBtnOn() == HIGH) &&
      (digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == HIGH) &&
      (pump_amps >= PUMP_AMPS_THRESHOLD) &&
      (pressure >= PUMP_PRESSURE_THRESHOLD) &&
@@ -298,15 +256,15 @@ void loop()
      (heater_amps >= ALARM_HEATER_AMPS_HIGH) ||
      (pump_amps < PUMP_AMPS_THRESHOLD) ||
      (pressure < PUMP_PRESSURE_THRESHOLD) ||
-     (InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] == LOW))
+     (hotTubControl.isHotTubBtnOn() == LOW))
   {
     digitalWrite(HEATER_ON_OFF_OUTPUT_PIN, LOW);
   }
   
   
   // Turn on bubbler
-  if((InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] == HIGH) &&
-     (InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] == HIGH) &&
+  if((hotTubControl.isHotTubBtnOn() == HIGH) &&
+     (hotTubControl.isBubbleBtnOn() == HIGH) &&
      ((long)(millis() - last_bubbler_on_check) > BUBBLER_ON_DELAY))
   {
     digitalWrite(BUBBLER_ON_OFF_OUTPUT_PIN, HIGH);
@@ -314,24 +272,13 @@ void loop()
   }
 
   // Turn off bubbler
-  if(InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] == LOW || InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] == LOW)
+  if(hotTubControl.isBubbleBtnOn() == LOW || hotTubControl.isHotTubBtnOn() == LOW)
   {
     digitalWrite(BUBBLER_ON_OFF_OUTPUT_PIN, LOW);
-    InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] = LOW;
   }
 
-  // Send data to User Panel via I2C bus
-  I2c.write( SLAVE_ID, ADR_ONOFF_STAT,  InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF] );  
-  delay(15);  // srg temp
-  I2c.write( SLAVE_ID, ADR_PUMP_STAT,   InputButtonsCurrentState[BTN_JETS_ON_OFF] );  
-  delay(15);
-  I2c.write( SLAVE_ID, ADR_BUBBLE_STAT, InputButtonsCurrentState[BTN_BUBBLER_ON_OFF] );
-  delay(15);
-  I2c.write( SLAVE_ID, ADR_HEATER_STAT, digitalRead(HEATER_ON_OFF_OUTPUT_PIN) );
-  delay(15);
-  I2c.write( SLAVE_ID, ADR_TEMP_SETPT,  tempPreHeat );
-  delay(15);
-  
+  // Update user panel with hot tub info: Water temp, Hot 
+  hotTubControl.writePanelStatus( tempPreHeat,  digitalRead(PUMP_ON_OFF_OUTPUT_PIN),  digitalRead(BUBBLER_ON_OFF_OUTPUT_PIN),  digitalRead(HEATER_ON_OFF_OUTPUT_PIN) );
 
 }  // loop()
 
@@ -429,7 +376,7 @@ boolean NeedHeat()
 { 
   if(digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == HIGH)
   { // heater is on
-    if (tempPreHeat > (float) Temperature_Setpoint + 0.4 )  // temperature has reached setpoint, don't need heat anymore
+    if (tempPreHeat > (float) hotTubControl.getTempSetpoint() + 0.4 )  // temperature has reached setpoint, don't need heat anymore
     {
       // If heater was just turned on, then don't turn off until 3 minutes has passed
       if ( (long)(millis() - heatOntime) > 3UL * 60000UL )
@@ -447,7 +394,7 @@ Serial.print("Heater Off.  Millis - heatOntime = "); Serial.println( (long)(mill
   }
   else // heater is off
   { 
-    if (tempPreHeat < (float) Temperature_Setpoint - 0.4 )  // Turn on heater if it's 0.8 degree below setpoint
+    if (tempPreHeat < (float) hotTubControl.getTempSetpoint() - 0.4 )  // Turn on heater if it's 0.8 degree below setpoint
     {
       heatOntime = millis(); // Heater was off and it needs to be turned on.  Record heater on time
       return true;
@@ -583,10 +530,10 @@ void PrintStatus()
     }
     cntHeading++;
     
-    Serial.print(InputButtonsCurrentState[BTN_HOT_TUB_ON_OFF]);
+    Serial.print(hotTubControl.isHotTubBtnOn());
     Serial.print("\t");
     
-    Serial.print(InputButtonsCurrentState[BTN_JETS_ON_OFF]);
+    Serial.print(hotTubControl.isPumpBtnOn());
     Serial.print(digitalRead(PUMP_ON_OFF_OUTPUT_PIN));
     Serial.print(F("\t"));
     
@@ -597,10 +544,10 @@ void PrintStatus()
     Serial.print(tempPreHeat);
     Serial.print(F("\t"));
 
-    Serial.print(Temperature_Setpoint);
+    Serial.print(hotTubControl.getTempSetpoint());
     Serial.print(F("\t"));
 
-    Serial.print(InputButtonsCurrentState[BTN_BUBBLER_ON_OFF]);
+    Serial.print(hotTubControl.isBubbleBtnOn());
     Serial.print(digitalRead(BUBBLER_ON_OFF_OUTPUT_PIN));
     Serial.print(F("\t"));
 

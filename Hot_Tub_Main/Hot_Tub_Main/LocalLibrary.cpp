@@ -12,10 +12,64 @@ HotTubControl::~HotTubControl()
 }
 
 
+void HotTubControl::begin()
+{
+  // Setup I2C
+  I2c.begin();  // Initialize I2C
+  I2c.pullup(0); // turn off internal pullups (doesn't do anything on mega)
+  I2c.timeOut(30000); // 30 second timeout
+
+
+}
+
+void HotTubControl::readPanelStatus()
+{
+  // Read pushbuttons status and temperature setpoint from user panel
+  I2c.write(SLAVE_ID, CMD_ONOFF_BTN);
+  delay(1);
+  I2c.read(SLAVE_ID, 1);                                           // request on/off button status
+  _hotTubBtn = I2c.receive();    // Read the on/off button status from slave
+
+  I2c.write(SLAVE_ID, CMD_PUMP_BTN);
+  delay(1);
+  I2c.read(SLAVE_ID, 1);
+  _pumpBtn = I2c.receive();
+
+  I2c.write(SLAVE_ID, CMD_BUBBLE_BTN);
+  delay(1);
+  I2c.read(SLAVE_ID, 1);
+  _bubbleBtn = I2c.receive();
+
+  I2c.write(SLAVE_ID, CMD_TEMP_SETPT);
+  delay(1);
+  I2c.read(SLAVE_ID, 1);
+  _targetTemp = I2c.receive();
+
+}
+
+// Send status to panel: current water temp, pump on, heat on, bubbles on
+void HotTubControl::writePanelStatus(float currentTemp, bool pumpState, bool bubbleState, bool heatState)
+{
+
+  int i2cWriteDelay = 15;  // srg temp - may not need delay
+  
+  // Send data to User Panel via I2C bus
+  I2c.write( SLAVE_ID, ADR_ONOFF_STAT,  _hotTubBtn );
+  delay(i2cWriteDelay);  
+  I2c.write( SLAVE_ID, ADR_PUMP_STAT,   pumpState );
+  delay(i2cWriteDelay);
+  I2c.write( SLAVE_ID, ADR_BUBBLE_STAT, bubbleState );
+  delay(i2cWriteDelay);
+  I2c.write( SLAVE_ID, ADR_HEATER_STAT, heatState );
+  delay(i2cWriteDelay);
+  I2c.write( SLAVE_ID, ADR_TEMP_SETPT,  currentTemp );
+  delay(i2cWriteDelay);
+
+}
+
 // Read sensors
 void HotTubControl::refreshSensors()
 {
-
 
   
 }
@@ -61,11 +115,32 @@ bool HotTubControl::needHeatt()
 } // End needHeat()
 
 
-void refreshSensors();
-bool isHotTubBtnOn();
-bool isPumpBtnOn();
-bool isBubbleBtnOn();
-void setTempSetpoint(byte targetTemp);  // saves the setpoint temp, which is set from control panel
-byte getTempSetpoint();                 // returns the setpoint temp
+
+// Returns state of On/Off pushbutton on control panel
+bool HotTubControl::isHotTubBtnOn()
+{
+  return _hotTubBtn;
+}
+
+
+// Returns state of pump pushbutton on control panel
+bool HotTubControl::isPumpBtnOn()
+{
+  return _pumpBtn;
+}
+
+// Returns state of bubbles pushbutton on control panel
+bool HotTubControl::isBubbleBtnOn()
+{
+  return _bubbleBtn;
+}
+
+
+// returns the setpoint temp
+byte HotTubControl::getTempSetpoint()
+{
+  return _targetTemp;
+}
+
 
 
