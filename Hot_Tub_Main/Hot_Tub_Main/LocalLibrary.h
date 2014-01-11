@@ -7,9 +7,9 @@
 #include <I2C.h>               // use for I2C communication  http://dsscircuits.com/articles/arduino-i2c-master-library.html
 
 
-#define SLAVE_ID     46 // I2C address of LED backpack on user panel
-#define I2C_SUCCESS   0 // When I2C read/writes are sucessful, function returns 0
-#define MAX_I2C_BYTES 6 // Max I2C bytes to send data to slave
+const int SLAVE_ID =     46; // I2C address of LED backpack on user panel
+const int I2C_SUCCESS =   0; // When I2C read/writes are sucessful, function returns 0
+const int MAX_I2C_BYTES = 6; // Max I2C bytes to send data to slave
 
 
 #define MEGA  // set this if using an Arduino Mega
@@ -55,23 +55,24 @@
 
 // I2C Commands to read data from LED backpack user panel
 enum {
-  CMD_SAVE_ALL    =  1,  // writes all data from Mater to slave
-  CMD_SLAVE_ID    =  2,
-  CMD_ONOFF_BTN   =  3,
-  CMD_PUMP_BTN    =  4,
-  CMD_BUBBLE_BTN  =  5,
-  CMD_TEMP_SETPT  =  6,
-  ADR_ONOFF_STAT  =  7, // Addresses to save data to slave
-  ADR_PUMP_STAT   =  8,
-  ADR_BUBBLE_STAT =  9,
-  ADR_HEATER_STAT = 10,
-  ADR_TEMP_SETPT  = 11
+  CMD_SAVE_ALL    =  1,  // writes all data from Mater to slave - not used
+  CMD_SLAVE_ID    =  2,  // commands slave to return slave ID
+  CMD_ONOFF_BTN   =  3,  // commands slave to return on/off button status
+  CMD_PUMP_BTN    =  4,  // commands slave to return pump button status
+  CMD_BUBBLE_BTN  =  5,  // commands slave to return bubble button status
+  CMD_TEMP_SETPT  =  6,  // commands slave to return  setpoint temperature
+  ADR_ONOFF_STAT  =  7, // Register addresses for on/off status
+  ADR_PUMP_STAT   =  8, // Register addresses for pump status
+  ADR_BUBBLE_STAT =  9, // Register addresses for bubbler status
+  ADR_HEATER_STAT = 10, // Register addresses for heater status
+  ADR_TEMP_SETPT  = 11  // Register addresses for temperature setpoint
 };
 
 // link to OneWire temp sensors defined in Hot_Tub_Main.ino 
 extern OneWire oneWire;
 extern DallasTemperature oneWireBus;
 
+// Address IDs for OneWire temperature sensors
 static uint8_t tempSensor[4][8] =
 {
   { 0x28, 0x0A, 0x48, 0x00, 0x05, 0x00, 0x00, 0x33 },  // pre heater temp sensor 1, lower sensor
@@ -93,14 +94,14 @@ public:
   bool isHotTubBtnOn();    // Returns state of On/Off button on control panel
   bool isPumpBtnOn();      // Returns state of Pump button on control panel
   bool isBubbleBtnOn();    // Returns state of Bubble button on control panel
-  byte getTempSetpoint();  // returns the setpoint temp
-  float getTempPreHeat();
-  float getTempPostHeat();
-  float getTempPump();
-  float getPressure();
-  float getAmpsPump();
-  float getAmpsHeater();
-  float getAmpsBubbler();
+  byte getTempSetpoint();  // Returns the setpoint temp
+  float getTempPreHeat();  // Returns Pre-heater temperature
+  float getTempPostHeat(); // Returns Post-heater temperature
+  float getTempPump();     // Returns pump housing temperature
+  float getPressure();     // Returns water pressure
+  float getAmpsPump();     // Returns pump amps
+  float getAmpsHeater();   // Returns heater amps
+  float getAmpsBubbler();  // Returns bubbler amps
   
 
 private:
@@ -116,9 +117,9 @@ private:
   float _ampsHeater;
   float _ampsPump;
   float _ampsBubbler;
-  void readTemperature();
-  void readPressure();
-  void readAmps();
+  void readTemperature();  // Reads the OneWire temp sensors
+  void readPressure();     // Reads the pressure sensor
+  void readAmps();         // Reads the amps sensors
   
 };
 
