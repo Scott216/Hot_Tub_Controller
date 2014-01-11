@@ -32,6 +32,8 @@ const int MAX_I2C_BYTES = 6; // Max I2C bytes to send data to slave
 #define BUBBLER_ON_OFF_OUTPUT_PIN   8
 
 #define ONE_WIRE_BUS 37 // OneWire data pin
+#define OLED_RESET 4
+
 #endif
 
 #ifdef PANSTAMP
@@ -50,6 +52,8 @@ const int MAX_I2C_BYTES = 6; // Max I2C bytes to send data to slave
 #define BUBBLER_ON_OFF_OUTPUT_PIN   5
 
 #define ONE_WIRE_BUS 6 // OneWire data pin
+#define OLED_RESET 4
+
 #endif
 
 

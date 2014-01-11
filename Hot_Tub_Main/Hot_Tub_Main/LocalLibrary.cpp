@@ -2,12 +2,11 @@
 
 
 HotTubControl::HotTubControl()
-{
-}
+{ }
+
 
 HotTubControl::~HotTubControl()
-{
-}
+{ }
 
 
 void HotTubControl::begin()
@@ -18,7 +17,8 @@ void HotTubControl::begin()
   I2c.timeOut(30000); // 30 second timeout
 
   oneWireBus.begin(); // Initialize OneWire
-}
+} // begin()
+
 
 void HotTubControl::readPanelStatus()
 {
@@ -43,7 +43,8 @@ void HotTubControl::readPanelStatus()
   I2c.read(SLAVE_ID, 1);
   _targetTemp = I2c.receive();
 
-}
+} // readPanelStatus()
+
 
 // Send status to panel: current water temp, pump on, heat on, bubbles on
 void HotTubControl::writePanelStatus(float currentTemp, bool pumpState, bool bubbleState, bool heatState)
@@ -63,25 +64,24 @@ void HotTubControl::writePanelStatus(float currentTemp, bool pumpState, bool bub
   I2c.write( SLAVE_ID, ADR_TEMP_SETPT,  currentTemp );
   delay(i2cWriteDelay);
 
-}
+} // writePanelStatus()
+
 
 // Read sensors
 void HotTubControl::refreshSensors()
 {
-
   readTemperature();
   readPressure();
   readAmps();
-
   /*
    // SRG dummy data when not connected to main controller board
-   _tempPreheat =   98;
-   _tempPostHeat = 110;
-   _tempPump =     150;
-   _ampsPump =     9.0;
-   _ampsHeater =  22.0;
-   _ampsBubbler =  5.0;
-   _Pressure =    15.0;
+   _tempPreheat =   98.0;
+   _tempPostHeat = 110.0;
+   _tempPump =     150.0;
+   _ampsPump =       9.0;
+   _ampsHeater =    22.0;
+   _ampsBubbler =    5.0;
+   _Pressure =      15.0;
    */
 
 } // refreshSensors()
@@ -90,31 +90,34 @@ void HotTubControl::refreshSensors()
 // Get temperatures from 1-wire sensors
 void HotTubControl::readTemperature()
 {
-  // Determine which sensor to take measurement from
+
   float validTemp;
   float PreHeaterTemp1;
   float PreHeaterTemp2;
-  oneWireBus.requestTemperatures();   // Send the command to get temperatures
+
+  // Refresh temperatures 
+  oneWireBus.requestTemperatures();
+  
   validTemp = oneWireBus.getTempF(&tempSensor[0][0]);
-  if (validTemp > 40)
+  if (validTemp > 40.0)
   { PreHeaterTemp1 = validTemp; }
 
   validTemp = oneWireBus.getTempF(&tempSensor[1][0]);
-  if (validTemp > 40)
+  if (validTemp > 40.0)
   { PreHeaterTemp2 = validTemp; }
 
   validTemp = oneWireBus.getTempF(&tempSensor[2][0]);
-  if (validTemp > 40)
+  if (validTemp > 40.0)
   { _tempPostHeat = validTemp; }
 
   validTemp = oneWireBus.getTempF(&tempSensor[3][0]);
-  if (validTemp > 40)
+  if (validTemp > 40.0)
   { _tempPump = validTemp; }
 
-  if(abs(PreHeaterTemp1 - PreHeaterTemp2) < 4)
+  if(abs(PreHeaterTemp1 - PreHeaterTemp2) < 4.0)
   {
     // Two probes are relatively close, just take the average for the temp
-    _tempPreheat =  (PreHeaterTemp1 + PreHeaterTemp2) / 2;
+    _tempPreheat =  (PreHeaterTemp1 + PreHeaterTemp2) / 2.0;
   }
   else if(PreHeaterTemp1 > PreHeaterTemp2)    // Temp probes are not very close, choose higher one so heater doesn't stay on all the time
   { _tempPreheat =  PreHeaterTemp1; }
@@ -125,6 +128,7 @@ void HotTubControl::readTemperature()
 
 
 // Read pressure gauge
+// Average 25 samples
 void HotTubControl::readPressure()
 {
   float pressure = 0.0;
@@ -139,14 +143,15 @@ void HotTubControl::readPressure()
   // Calculate averages from samples
   _Pressure = ( pressure / (float)samples ) * 0.0377 - 7.5094 + 0.25;   // 0.25 PSI calibration offset
 
-  // If values are close to zero, then set to zero
-  if (_Pressure < 2.0) pressure = 0.0;
+  // If value is close to zero, then set to zero
+  if (_Pressure < 2.0) _Pressure = 0.0;
   
 } // readPressure()
 
 
 
 // Read amps sensors
+// Average 25 samples
 void HotTubControl::readAmps()
 {
   // Take multiple samples and get average
@@ -178,66 +183,51 @@ void HotTubControl::readAmps()
 
 
 float HotTubControl::getTempPreHeat()
-{
-  return _tempPreheat;
-}
+{ return _tempPreheat; }
+
 
 float HotTubControl::getTempPostHeat()
-{
-  return _tempPostHeat;
-}
+{ return _tempPostHeat; }
+
 
 float HotTubControl::getTempPump()
-{
-  return _tempPump;
-}
+{ return _tempPump; }
+
 
 float HotTubControl::getPressure()
-{
-  return _Pressure;
-}
+{ return _Pressure; }
+
 
 float HotTubControl::getAmpsPump()
-{
-  return _ampsPump;
-}
+{ return _ampsPump; }
+
 
 float HotTubControl::getAmpsHeater()
-{
-  return _ampsHeater;
-}
+{ return _ampsHeater; }
+
 
 float HotTubControl::getAmpsBubbler()
-{
-  return _ampsBubbler;
-}
+{ return _ampsBubbler; }
 
 
 // Returns state of On/Off pushbutton on control panel
 bool HotTubControl::isHotTubBtnOn()
-{
-  return _hotTubBtn;
-}
+{ return _hotTubBtn; }
 
 
 // Returns state of pump pushbutton on control panel
 bool HotTubControl::isPumpBtnOn()
-{
-  return _pumpBtn;
-}
+{ return _pumpBtn; }
+
 
 // Returns state of bubbles pushbutton on control panel
 bool HotTubControl::isBubbleBtnOn()
-{
-  return _bubbleBtn;
-}
+{ return _bubbleBtn; }
 
 
 // returns the setpoint temp
 byte HotTubControl::getTempSetpoint()
-{
-  return _targetTemp;
-}
+{ return _targetTemp; }
 
 
 

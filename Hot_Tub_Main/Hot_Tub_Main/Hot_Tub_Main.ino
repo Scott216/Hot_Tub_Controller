@@ -7,6 +7,8 @@
 #include <OneWire.h>           // http://www.pjrc.com/teensy/td_libs_OneWire.html  http://playground.arduino.cc/Learning/OneWire
 #include <DallasTemperature.h> // http://milesburton.com/index.php?title=Dallas_Temperature_Control_Library
 #include <I2C.h>               // use for I2C communication  http://dsscircuits.com/articles/arduino-i2c-master-library.html
+#include <SSD1306_I2C_DSS.h>   // Library for OLED display http://github.com/Scott216/SSD1306_I2C_DSS
+#include <Adafruit_GFX.h>      // Library for OLED display http://github.com/adafruit/Adafruit-GFX-Library
 #include "LocalLibrary.h"
 
 
@@ -34,6 +36,9 @@ bool needHeatStatus = false;  // Saves NeedHeat() status, used so the NeedHeat()
 #define PUMP_AMPS_THRESHOLD       2  // Min amps needed verify pump is on
 #define PUMP_PRESSURE_THRESHOLD   5  // Min PSI needed to verify pump is running
 
+#define I2C_TIMEOUT 20000
+Adafruit_SSD1306 display(OLED_RESET, I2C_TIMEOUT);
+
 
 // Initialize OneWire temp sensors, they are used in LocalLibrary.cpp
 OneWire oneWire(ONE_WIRE_BUS);
@@ -41,7 +46,7 @@ DallasTemperature oneWireBus(&oneWire);
 
 
 // Define Function Prototypes
-void CheckAlarms();
+bool CheckAlarms();
 void OutputAlarm(char AlarmText[]);
 void PrintStatus();
 boolean NeedHeat();
@@ -63,7 +68,17 @@ void setup()
   
   // Initialize timers
   heater_cooldown_timer = 0;
-  
+
+  // Initialize OLED display
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 128x32)
+  display.setRotation(0);  // Orientation 0 = right side up, 2 = upside down
+  display.clearDisplay();  // clears the screen and buffer
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0,0);
+  display.println(F("Finished setup()"));
+  display.display();
+
   Serial.println(F("Finished Hot Tub setup()"));
   
 } // setup()
@@ -218,14 +233,16 @@ boolean NeedHeat()
  Differnet heater amps from Ph 1 to Ph 2
 */
 //*********************************************************************************
-void CheckAlarms()
+bool CheckAlarms()
 {
   char txtAlarm[75];
+  bool isAlarm = false;
   
   // High water temp, pre-heater
   if ( hotTubControl.getTempPreHeat() > 120 )
   {
     sprintf_P(txtAlarm, PSTR("High pre-heater temperature = %d degrees"), (int) hotTubControl.getTempPreHeat() );
+    isAlarm = true;
     OutputAlarm(txtAlarm);
   }
   
@@ -233,6 +250,7 @@ void CheckAlarms()
   if (  hotTubControl.getTempPostHeat() > 150 )
   {
     sprintf_P(txtAlarm, PSTR("High post-heater temperature = %d degrees"), (int) hotTubControl.getTempPostHeat() );
+    isAlarm = true;
     OutputAlarm(txtAlarm);
   }
   
@@ -240,6 +258,7 @@ void CheckAlarms()
   if ( hotTubControl.getTempPump() > 150 )
   {
     sprintf_P(txtAlarm, PSTR("High pump housing temperature = %d degrees"), (int) hotTubControl.getTempPump() );
+    isAlarm = true;
     OutputAlarm(txtAlarm);
   }
   
@@ -247,6 +266,7 @@ void CheckAlarms()
   if ( hotTubControl.getTempPreHeat() < 50 )
   {
     sprintf_P(txtAlarm, PSTR("Low pre-heater temperature = %d degrees"), (int) hotTubControl.getTempPreHeat() );
+    isAlarm = true;
     OutputAlarm(txtAlarm);
   }
   
@@ -254,6 +274,7 @@ void CheckAlarms()
   if ( hotTubControl.getPressure() > 20.0 )
   {
     sprintf_P(txtAlarm, PSTR("High pressure alarm, pressure = %d PSI"), (int) hotTubControl.getPressure() );
+    isAlarm = true;
     OutputAlarm(txtAlarm);
   }
   
@@ -261,6 +282,7 @@ void CheckAlarms()
   if ( hotTubControl.getAmpsPump() > 18.0 )
   {
     sprintf_P(txtAlarm, PSTR("High pump amps alarm = %d amps"), (int) hotTubControl.getAmpsPump() );
+    isAlarm = true;
     OutputAlarm(txtAlarm);
   }
   
@@ -268,6 +290,7 @@ void CheckAlarms()
   if ( (hotTubControl.getPressure() < 5.0) && (digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == HIGH) )
   {
     sprintf_P(txtAlarm, PSTR("Low pressure alarm while pump is on, pressure = %d PSI"), (int) hotTubControl.getPressure() );
+    isAlarm = true;
     OutputAlarm(txtAlarm);
   }
   
@@ -275,6 +298,7 @@ void CheckAlarms()
   if ( hotTubControl.getAmpsHeater() > ALARM_HEATER_AMPS_HIGH )
   {
     sprintf_P(txtAlarm, PSTR("High heater amps = %d"), (int) hotTubControl.getAmpsHeater() );
+    isAlarm = true;
     OutputAlarm(txtAlarm);
   }
   
@@ -282,9 +306,20 @@ void CheckAlarms()
   if ( (hotTubControl.getAmpsHeater() < 15) && (digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == HIGH) )
   {
     sprintf_P(txtAlarm, PSTR("Low heater amps while heater is on = %d amps"), (int) hotTubControl.getAmpsHeater() );
+    isAlarm = true;
     OutputAlarm(txtAlarm);
   }
-  
+
+  if (isAlarm == false )
+  {
+    display.clearDisplay();  // clears the screen and buffer
+    display.setCursor(0,0);
+    display.println(F("Everything okay"));
+    display.display();
+  }
+
+  return isAlarm;
+
 } // end CheckAlarms()
 
 
@@ -296,6 +331,12 @@ void OutputAlarm(char AlarmText[])
 {
   Serial.print(F("Alarm: "));
   Serial.println(AlarmText);
+
+  display.clearDisplay();  // clears the screen and buffer
+  display.setCursor(0,0);
+  display.println(AlarmText);
+  display.display();
+
 } // OutputAlarm()
 
 
