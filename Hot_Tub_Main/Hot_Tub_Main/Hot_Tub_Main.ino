@@ -48,11 +48,13 @@ DallasTemperature oneWireBus(&oneWire);
 // Define Function Prototypes
 bool CheckAlarms();
 void OutputAlarm(char AlarmText[]);
+void updateDisplay();
 void PrintStatus();
 boolean NeedHeat();
 
 
 
+//============================================================================
 //============================================================================
 void setup()
 {
@@ -62,7 +64,7 @@ void setup()
   pinMode(PUMP_ON_OFF_OUTPUT_PIN,    OUTPUT);
   pinMode(HEATER_ON_OFF_OUTPUT_PIN,  OUTPUT);
   pinMode(BUBBLER_ON_OFF_OUTPUT_PIN, OUTPUT);
-
+  
   // initialize hotTubControl 
   hotTubControl.begin();
   
@@ -71,20 +73,19 @@ void setup()
 
   // Initialize OLED display
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 128x32)
-  display.setRotation(0);  // Orientation 0 = right side up, 2 = upside down
+  display.setRotation(2);  // Orientation 0 = right side up, 2 = upside down
   display.clearDisplay();  // clears the screen and buffer
   display.setTextSize(1);
   display.setTextColor(WHITE);
-  display.setCursor(0,0);
+  display.setCursor(0,8);
   display.println(F("Finished setup()"));
   display.display();
-
   Serial.println(F("Finished Hot Tub setup()"));
   
 } // setup()
 
 
-
+//============================================================================
 //============================================================================
 void loop()
 {
@@ -104,67 +105,55 @@ void loop()
     // If heater has changed state in the last 3 minutes or less, don't check yet. This is used to keep heater from going on/off too quickly
     if ( (long)(millis() - heaterChangeTime ) > 3UL * 60000UL )
     { needHeatStatus = NeedHeat(); } // 3 mintues has passed, okay to check NeedHeat()
+    updateDisplay();
   }
   
   // Check alarms
   if ((long)(millis() - last_alarm_check) > ALARM_CHECK_INTERVAL)
   {
-    last_alarm_check = millis();
     CheckAlarms();
+    last_alarm_check = millis();
   }
 
-  PrintStatus();  // Print for debugging
-  
+  PrintStatus();  // srg Print for debugging
 
   // Turn off pump
-  // If Hot tub is turned off and cooldown delay has passed, or
-  // Jets button is off and we don't need heat, and cooldown delay has passed
-  if((hotTubControl.isHotTubBtnOn() == LOW && (long)(millis() - heater_cooldown_timer) > 0) ||
-     (hotTubControl.isPumpBtnOn() == LOW && needHeatStatus == false && (long)(millis() - heater_cooldown_timer) > 0) )
+  bool coolDownTimerExpired = (long)(millis() - heater_cooldown_timer) > 0;  // runs water past heater after heater is off so it will cool down
+  
+  if ( coolDownTimerExpired )
   {
-    digitalWrite(PUMP_ON_OFF_OUTPUT_PIN, LOW);
+    if ( !hotTubControl.isHotTubBtnOn() || (!hotTubControl.isPumpBtnOn() && !needHeatStatus) )
+    { digitalWrite(PUMP_ON_OFF_OUTPUT_PIN, LOW); }
   }
   
   // Turn on pump
+  bool pumpOnDelayTimerExpired = (long)(millis() - lastPumpOnTime) > PUMP_ON_DELAY;  // Timer used to prevent pump from cycling too quickly
+  bool needPump = hotTubControl.isPumpBtnOn() || needHeatStatus; // Either button or heager needs pump turned on
+  
   // Pump is turned on either by manually by pushbutton or by the heater
-  if((hotTubControl.isHotTubBtnOn() == HIGH) &&                          // Hot tub must be on
-     ((hotTubControl.isPumpBtnOn() == HIGH) || (needHeatStatus == true)) &&   // Pushbutton OR Need heat
-     ((long)(millis() - lastPumpOnTime) > PUMP_ON_DELAY))                           // Delay before pump can be turned on again after being off, prevents fast cycling if there is a problem
+  if( hotTubControl.isHotTubBtnOn() &&  needPump && pumpOnDelayTimerExpired )                            
   {
     digitalWrite(PUMP_ON_OFF_OUTPUT_PIN, HIGH);
     lastPumpOnTime = millis();
   }
     
+ 
+  // Heater control
+  bool pumpIsRunning =  digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == HIGH && hotTubControl.getAmpsPump() >= PUMP_AMPS_THRESHOLD && hotTubControl.getPressure() >= PUMP_PRESSURE_THRESHOLD;
+  bool heaterAmpsOK = hotTubControl.getAmpsHeater() >= ALARM_HEATER_AMPS_HIGH; 
   
-  // Turn on heater
-  // Prerequisites: Hot Tub On + Pump amps and pressure are above threshold + Low water temp + Delay from last time on
-  if((hotTubControl.isHotTubBtnOn() == HIGH) &&
-     (digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == HIGH) &&
-     (hotTubControl.getAmpsPump() >= PUMP_AMPS_THRESHOLD) &&
-     (hotTubControl.getPressure() >= PUMP_PRESSURE_THRESHOLD) &&
-     (needHeatStatus == true)) 
-  {
+  if ( hotTubControl.isHotTubBtnOn() && pumpIsRunning && needHeatStatus && heaterAmpsOK ) 
+  { // Turn on heater
+  
     // If heater is changing state from off to on, reset heaterChangeTime 
     if ( digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == LOW )
     { heaterChangeTime = millis(); }       
+    
     digitalWrite(HEATER_ON_OFF_OUTPUT_PIN, HIGH);
-    Serial.print("Millis 2: "); Serial.println(millis()); // srg debug
+    heater_cooldown_timer = millis() + HEATER_COOLDOWN_DELAY;   // update heater cooldown timer
     delay(300); // srg testing pump cycle
   }
-  
-  // If heater is on, update last heater on check, and heater_cooldown_timer
-  if(digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == HIGH)
-  { heater_cooldown_timer = millis() + HEATER_COOLDOWN_DELAY; }
-  
-  
-  // Turn off heater
-  // Turn off when water temp reaches setpoint or if heater amps is too high or Hot Tub is turned off
-  // Or Pump pressure is too low, or pump amps is too low.
-  if((needHeatStatus == false) ||
-     (hotTubControl.getAmpsHeater() >= ALARM_HEATER_AMPS_HIGH) ||
-     (hotTubControl.getAmpsPump() < PUMP_AMPS_THRESHOLD) ||
-     (hotTubControl.getPressure() < PUMP_PRESSURE_THRESHOLD) ||
-     (hotTubControl.isHotTubBtnOn() == LOW))
+  else // Turn heater off
   {
     // If heater is changing state from on to off, reset heaterChangeTime
     if ( digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == HIGH )
@@ -176,18 +165,17 @@ void loop()
   }
   
   
-  // Turn on bubbler
-  if((hotTubControl.isHotTubBtnOn() == HIGH) &&
-     (hotTubControl.isBubbleBtnOn() == HIGH) &&
-     ((long)(millis() - last_bubbler_on_check) > BUBBLER_ON_DELAY))
+  // Bubbler Control
+  bool needBubbler = hotTubControl.isHotTubBtnOn() &&  hotTubControl.isBubbleBtnOn(); 
+  bool bubbleDelayExpired = (long)(millis() - last_bubbler_on_check) > BUBBLER_ON_DELAY; // Delay to prevent bubbler from cycling too fast
+  if ( needBubbler & bubbleDelayExpired )
   {
-    digitalWrite(BUBBLER_ON_OFF_OUTPUT_PIN, HIGH);
+    digitalWrite(BUBBLER_ON_OFF_OUTPUT_PIN, HIGH);  // turn bubbler on
     last_bubbler_on_check = millis();
   }
+  else
+  { digitalWrite(BUBBLER_ON_OFF_OUTPUT_PIN, LOW); }  // Turn bubbler off
 
-  // Turn off bubbler
-  if(hotTubControl.isBubbleBtnOn() == LOW || hotTubControl.isHotTubBtnOn() == LOW)
-  { digitalWrite(BUBBLER_ON_OFF_OUTPUT_PIN, LOW); }
 
   // Update user panel with hot tub info: Water temp, Motor on/off state
   hotTubControl.writePanelStatus( hotTubControl.getTempPreHeat(),
@@ -198,10 +186,11 @@ void loop()
 }  // loop()
 
 
-
+//============================================================================
 // Determine if hot tub heater should be turned on
 // If heater is on, keep it on until temp goes above upper limit
 // if heater is off, keep it off until temp drops below lower limit
+//============================================================================
 boolean NeedHeat()
 {
   float upperLimit = (float) hotTubControl.getTempSetpoint() + 0.4;
@@ -214,12 +203,31 @@ boolean NeedHeat()
   else
   { return false; } // Temp is between LL and UL, keep off
 
-
-} // End NeedHeat()
-
+} // end NeedHeat()
 
 
-//*********************************************************************************
+//============================================================================
+// Update OLED display with stats on the sensors
+//============================================================================
+void updateDisplay()
+{
+  char dispTxt[22];
+  
+  display.clearDisplay();
+  display.setCursor(0,0);
+  sprintf(dispTxt, "Amp H:%d P:%d B:%d", (int)hotTubControl.getAmpsHeater(), (int)hotTubControl.getAmpsPump(), (int)hotTubControl.getAmpsBubbler());
+  display.println(dispTxt);
+  sprintf(dispTxt, "Temp %d %d %d %d",  (int)hotTubControl.getTempSetpoint(), (int)hotTubControl.getTempPreHeat(), (int)hotTubControl.getTempPostHeat(), (int)hotTubControl.getTempPump()); 
+  display.setCursor(0,9);
+  display.println(dispTxt);
+  display.setCursor(0,19);
+  sprintf(dispTxt, "P %d, Htr %d",  (int)hotTubControl.getPressure(), digitalRead(HEATER_ON_OFF_OUTPUT_PIN)); 
+  display.println(dispTxt);  
+  display.display();
+
+}  // end updateDisplay()
+
+//============================================================================
 /*
  Check for alarms
  High Water Temp
@@ -232,7 +240,7 @@ boolean NeedHeat()
  Low Heater Amps
  Differnet heater amps from Ph 1 to Ph 2
 */
-//*********************************************************************************
+//============================================================================
 bool CheckAlarms()
 {
   char txtAlarm[75];
@@ -309,7 +317,7 @@ bool CheckAlarms()
     isAlarm = true;
     OutputAlarm(txtAlarm);
   }
-
+/*
   if (isAlarm == false )
   {
     display.clearDisplay();  // clears the screen and buffer
@@ -317,33 +325,29 @@ bool CheckAlarms()
     display.println(F("Everything okay"));
     display.display();
   }
-
+*/
   return isAlarm;
-
 } // end CheckAlarms()
 
 
-
-//*********************************************************************************
+//============================================================================
 // Print Alarm Text  
-//*********************************************************************************
+//============================================================================
 void OutputAlarm(char AlarmText[])
 {
   Serial.print(F("Alarm: "));
   Serial.println(AlarmText);
-
+/*
   display.clearDisplay();  // clears the screen and buffer
   display.setCursor(0,0);
   display.println(AlarmText);
   display.display();
-
+*/
 } // OutputAlarm()
 
 
-
-
-//*********************************************************************************
-//*********************************************************************************
+//============================================================================
+//============================================================================
 void PrintStatus()
 {
   static int8_t   cntHeading;  // prints new heading every 20 rows
@@ -353,7 +357,6 @@ void PrintStatus()
   {
     PrintDelay = millis() + 500UL;
 
-    
     //Print Pushbutton state and Led indicator state
     if(cntHeading > 40 || millis() < 1000)
     {

@@ -12,8 +12,8 @@ const int I2C_SUCCESS =   0; // When I2C read/writes are sucessful, function ret
 const int MAX_I2C_BYTES = 6; // Max I2C bytes to send data to slave
 
 
-#define MEGA  // set this if using an Arduino Mega
-// #define PANSTAMP // set this if using Panstamp
+//#define MEGA  // set this if using an Arduino Mega
+#define PANSTAMP // set this if using Panstamp
 
 // Define I/0 Pins
 #ifdef MEGA
@@ -47,8 +47,8 @@ const int MAX_I2C_BYTES = 6; // Max I2C bytes to send data to slave
 #define PRESSURE_GAUGE 6  // Pressure, comes from 4-20mA gauge
 
 //=== Output pins for motor relays ===
-#define PUMP_ON_OFF_OUTPUT_PIN      3
-#define HEATER_ON_OFF_OUTPUT_PIN    4
+#define PUMP_ON_OFF_OUTPUT_PIN      7
+#define HEATER_ON_OFF_OUTPUT_PIN    6
 #define BUBBLER_ON_OFF_OUTPUT_PIN   5
 
 #define ONE_WIRE_BUS 6 // OneWire data pin
