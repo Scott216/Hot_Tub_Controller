@@ -1,5 +1,8 @@
 /*
 
+Board: Arduino Pro Mini 3.3 v
+
+
 directory: cd Dropbox/Arduino/Hot_Tub_Controller/ 
 
 
