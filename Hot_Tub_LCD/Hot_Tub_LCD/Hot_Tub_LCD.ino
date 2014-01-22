@@ -61,7 +61,7 @@ From Main board to backback
 
 
 // Include application, user and local libraries
-#include "LocalLibrary.h"
+#include "Hot_Tub_LCD_Library.h"
 
 //=== Output for LEDs in pushbuttons ===
 #define ON_OFF_INDICATOR_OUTPUT_PIN   A0   // Shows if hot tub is on or off

@@ -1,12 +1,26 @@
 
-I2C data to pass between main baord and LCD backpack
+  Hot_Tub_LCD
+  Project
+  ----------------------------------
+  Developed with embedXcode
 
-Data to send from main board to backpack
--On/Off Status of: Hot Tub, Bubbler, Pump, Heater
--Temperature
+  Project Hot_Tub_LCD
+  Created by Scott Goldthwaite on 1/22/14
+  Copyright © 2014 Scott Goldthwaite
+  License GNU General Public License
 
-Data to send from backpack to main board
--Request on/off: Hot Tub, Bubbler, Pump
--Temperature setpoint
 
-Might want to put all the encoder stuff in the class
+
+  References
+  ----------------------------------
+
+
+
+  embedXcode
+  embedXcode+
+  ----------------------------------
+  Embedded Computing on Xcode
+  Copyright © Rei VILO, 2010-2014
+  All rights reserved
+  http://embedXcode.weebly.com
+
