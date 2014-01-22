@@ -1,6 +1,9 @@
+/*
+To do: 
+try different encoder code
+debounce on buttons isn't so great.  Might be I2C related, not debounce 
 
-// To do: output for OLED display
-
+*/
 
 // === Libraries ===
 #include "Arduino.h"
@@ -14,6 +17,7 @@
 
 // Create HotTubController instance
 HotTubControl hotTubControl;
+// srg see if this works: HotTubControl *hotTubControl = new HotTubControl();
 
 // Setup timer variables 
 const uint32_t ALARM_CHECK_INTERVAL =     5000;  // Check for alarm every 5 seconds
@@ -49,9 +53,10 @@ DallasTemperature oneWireBus(&oneWire);
 bool CheckAlarms();
 void OutputAlarm(char AlarmText[]);
 void updateDisplay();
-void PrintStatus();
 boolean NeedHeat();
-
+void PrintStatus();
+void PrintStatusAll();
+void printHeaterInfo();
 
 
 //============================================================================
@@ -140,7 +145,7 @@ void loop()
  
   // Heater control
   bool pumpIsRunning =  digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == HIGH && hotTubControl.getAmpsPump() >= PUMP_AMPS_THRESHOLD && hotTubControl.getPressure() >= PUMP_PRESSURE_THRESHOLD;
-  bool heaterAmpsOK = hotTubControl.getAmpsHeater() >= ALARM_HEATER_AMPS_HIGH; 
+  bool heaterAmpsOK = hotTubControl.getAmpsHeater() <= ALARM_HEATER_AMPS_HIGH; 
   
   if ( hotTubControl.isHotTubBtnOn() && pumpIsRunning && needHeatStatus && heaterAmpsOK ) 
   { // Turn on heater
@@ -346,9 +351,49 @@ void OutputAlarm(char AlarmText[])
 } // OutputAlarm()
 
 
-//============================================================================
-//============================================================================
+
 void PrintStatus()
+{ 
+  printHeaterInfo();
+} // PrintStatus()
+
+
+void printHeaterInfo()
+{
+  static int8_t   cntHeading;  // prints new heading every 20 rows
+  static uint32_t PrintDelay;
+  
+  if ((long)(millis() - PrintDelay) > 0)
+  {
+    PrintDelay = millis() + 500UL;
+
+    //Print Pushbutton state and Led indicator state
+    if(cntHeading > 30 || millis() < 1000)
+    {
+      Serial.println(F("Need\tstat\ttemp\ttmr"));
+      cntHeading = 0;
+    }
+    cntHeading++;
+   
+    Serial.print(NeedHeat());
+    Serial.print("\t");
+    Serial.print(needHeatStatus);
+    Serial.print("\t");
+    Serial.print(hotTubControl.getTempPreHeat());
+    Serial.print("\t");
+    Serial.print((millis() - heaterChangeTime)/1000 );
+    Serial.print("\t");
+    
+    Serial.println();  
+  }
+  
+}  // printHeaterInfo()
+
+
+
+//============================================================================
+//============================================================================
+void PrintStatusAll()
 {
   static int8_t   cntHeading;  // prints new heading every 20 rows
   static uint32_t PrintDelay;
@@ -403,77 +448,8 @@ void PrintStatus()
     Serial.print((millis() - heaterChangeTime)/1000UL);
     
     Serial.println("");
-
-
-
-/*    
-    if (heater_cooldown_timer > millis())
-//    { Serial.print((heater_cooldown_timer - millis())/1000);}  // print seconds heaters need to cooldown before pump can turn off
-    { Serial.print(heater_cooldown_timer);}  // print seconds heaters need to cooldown before pump can turn off
-    else
-    { Serial.print(heater_cooldown_timer);}
-    Serial.print("\t");
-    
-    
-    Serial.print((int)((millis() - last_heater_on_check)/1000));
-    Serial.println();
-*/
-
-/*
-    
-     if(cntHeading > 40)
-     {
-     Serial.println("T1\tT2\tT3\tpres\tampH\tampP\tampB");
-     cntHeading = 0;
-     }
-     cntHeading++;
-     
-     Serial.print(hotTubControl.getTempPreHeat());
-     Serial.print("\t");
-     Serial.print(hotTubControl.getTempPostHeat());
-     Serial.print("\t");
-     Serial.print(hotTubControl.getTempPump());
-     Serial.print("\t");
-     Serial.print(hotTubControl.getPressure());
-     Serial.print("\t");
-     Serial.print(hotTubControl.getAmpsHeater());
-     Serial.print("\t");
-     Serial.print(hotTubControl.getAmpsPump());
-     Serial.print("\t");
-     Serial.print(hotTubControl.getAmpsBubbler());
-     Serial.println();
-*/
-
-
-    /*
-     if(cntHeading > 40)
-     {
-     Serial.println("T1\tT2\tT3\tT4\tI1\tI2\tI3\tI4");
-     cntHeading = 0;
-     }
-     cntHeading++;
-     
-     Serial.print(TempPreHeat1.readCelsius());
-     Serial.print("\t");
-     Serial.print(TempPreHeat2.readCelsius());
-     Serial.print("\t");
-     Serial.print(TempPostHeat.readCelsius());
-     Serial.print("\t");
-     Serial.print(TempPumpHousing.readCelsius());
-     Serial.print("\t");
-     Serial.print(TempPreHeat1.readInternal());
-     Serial.print("\t");
-     Serial.print(TempPreHeat2.readInternal());
-     Serial.print("\t");
-     Serial.print(TempPostHeat.readInternal());
-     Serial.print("\t");
-     Serial.print(TempPumpHousing.readInternal());
-     Serial.print("\t");
-     Serial.println();
-     */
-    
   }
-} // end PrintStatus()
+}  // PrintStatusAll()
 
 
 
