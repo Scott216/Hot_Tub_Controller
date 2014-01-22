@@ -1,9 +1,26 @@
-Hot tub controller - Main board. 
-This board does all the hot tub monitoring and control.
-It communicates with user panel via I2C
+
+  Hot_Tub_Main
+  Project
+  ----------------------------------
+  Developed with embedXcode
+
+  Project Hot_Tub_Main
+  Created by Scott Goldthwaite on 1/22/14
+  Copyright © 2014 Scott Goldthwaite
+  License GNU General Public License
 
 
-To do:
-See if encoder code from Tardis alarm clock works better
-Change needHeat limits ti +/- 0.8 F
-don't set heatOntime timer in needHeat() 
+
+  References
+  ----------------------------------
+
+
+
+  embedXcode
+  embedXcode+
+  ----------------------------------
+  Embedded Computing on Xcode
+  Copyright © Rei VILO, 2010-2014
+  All rights reserved
+  http://embedXcode.weebly.com
+

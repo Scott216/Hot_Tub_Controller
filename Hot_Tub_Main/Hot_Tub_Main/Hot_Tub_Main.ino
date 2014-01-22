@@ -12,7 +12,7 @@ debounce on buttons isn't so great.  Might be I2C related, not debounce
 #include <I2C.h>               // use for I2C communication  http://dsscircuits.com/articles/arduino-i2c-master-library.html
 #include <SSD1306_I2C_DSS.h>   // Library for OLED display http://github.com/Scott216/SSD1306_I2C_DSS
 #include <Adafruit_GFX.h>      // Library for OLED display http://github.com/adafruit/Adafruit-GFX-Library
-#include "LocalLibrary.h"
+#include "Hot_Tub_MainLibrary.h"
 
 
 // Create HotTubController instance
