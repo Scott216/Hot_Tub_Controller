@@ -37,7 +37,7 @@ void HotTub::begin()
   Wire.onReceive (i2cReceiveCmd);  // interrupt handler for incoming commands
   Wire.onRequest (i2cSendData);    // interrupt handler to send data to the master when the master requests it
 
-  
+
   // Set water temperature to default
   setWaterTemp( getWaterTempDefault() );
 }

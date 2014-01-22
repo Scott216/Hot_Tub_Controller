@@ -50,7 +50,7 @@ const uint8_t debounceDelay = 200; // debounce time in mS
 class HotTub
 {
   // need to define the variables as members of the 'class' because they are used in a static class
-  // Reference: http://www.cs.loyola.edu/~lawrie/CS301/F03/StaticClassMembers.htm
+  // Reference: http://www.cs.loyola.edu/~lawrie/CS301/F03/StaticClassMembers.htm 
   static bool _isHotTubOn;
   static bool _isBubblerOn;
   static bool _isPumpOn;
