@@ -19,17 +19,8 @@ debounce on buttons isn't so great.  Might be I2C related, not debounce
 HotTubControl hotTubControl;
 // srg see if this works: HotTubControl *hotTubControl = new HotTubControl();
 
-// Setup timer variables 
-const uint32_t ALARM_CHECK_INTERVAL =     5000;  // Check for alarm every 5 seconds
-      uint32_t last_alarm_check =            0;  // Timer used to check alarms every few seconds
-const uint32_t SENSOR_CHECK_INTERVAL =    1000;  // Check sensor every second
-      uint32_t last_sensor_check =           0;  // Timer used to read sensor values every second
-const uint32_t HEATER_ON_DELAY =         30000;  // Delay before heaters can be turned on again after being off
-const uint32_t PUMP_ON_DELAY =            5000;  // Delay before pump can be turned on again after being off
-const uint32_t BUBBLER_ON_DELAY =          700;  // Delay before bubbler can be turned on again after being off
-      uint32_t last_bubbler_on_check =       0;  // Timer used to prevent bubbler from being switched on too quickly
-const uint32_t HEATER_COOLDOWN_DELAY =   10000;  // When heater is turned off, keep pump running a few seconds to help heating coils cool down
-      uint32_t heater_cooldown_timer =       0;  // Timer used to keep pump on for a few seconds after heater has turned off
+ 
+//const uint32_t HEATER_ON_DELAY =         30000;  // Delay before heaters can be turned on again after being off
       uint32_t heaterChangeTime =            0;  // Records time heater state changed.  Used to keep heat on or off for at least 3 minutes
 
 
@@ -73,8 +64,6 @@ void setup()
   // initialize hotTubControl 
   hotTubControl.begin();
   
-  // Initialize timers
-  heater_cooldown_timer = 0;
 
   // Initialize OLED display
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 128x32)
@@ -94,8 +83,19 @@ void setup()
 //============================================================================
 void loop()
 {
+  // Setup timers
+  const uint32_t PUMP_ON_DELAY =            5000;  // Delay before pump can be turned on again after being off
+  const uint32_t ALARM_CHECK_INTERVAL =     5000;  // Check for alarm every 5 seconds
+  const uint32_t SENSOR_CHECK_INTERVAL =    1000;  // Check sensor every second
+  const uint32_t BUBBLER_ON_DELAY =          700;  // Delay before bubbler can be turned on again after being off
+  const uint32_t HEATER_COOLDOWN_DELAY =   10000;  // When heater is turned off, keep pump running a few seconds to help heating coils cool down
+  
+  static uint32_t last_sensor_check =           0;  // Timer used to read sensor values every second
+  static uint32_t last_alarm_check =            0;  // Timer used to check alarms every few seconds
   static uint32_t lastPumpOnTime; // Millis() Timestamp of when pump was last turned on.
                                   // Updates every cycle that pump should be on.  Used to keep pump from cycling on/off too fast
+  static uint32_t last_bubbler_on_check = 0;  // Timer used to prevent bubbler from being switched on too quickly
+  static uint32_t heater_cooldown_timer =       0;  // Timer used to keep pump on for a few seconds after heater has turned off
 
   // Read pushbuttons status and temperature setpoint from user panel
   hotTubControl.readPanelStatus();
@@ -110,7 +110,7 @@ void loop()
     // If heater has changed state in the last 3 minutes or less, don't check yet. This is used to keep heater from going on/off too quickly
     if ( (long)(millis() - heaterChangeTime ) > 3UL * 60000UL )
     { needHeatStatus = NeedHeat(); } // 3 mintues has passed, okay to check NeedHeat()
-    updateDisplay();
+//srg    updateDisplay();
   }
   
   // Check alarms
@@ -178,7 +178,7 @@ void loop()
     digitalWrite(BUBBLER_ON_OFF_OUTPUT_PIN, HIGH);  // turn bubbler on
     last_bubbler_on_check = millis();
   }
-  else
+  else if (!needBubbler)
   { digitalWrite(BUBBLER_ON_OFF_OUTPUT_PIN, LOW); }  // Turn bubbler off
 
 

@@ -92,18 +92,18 @@ void HotTubControl::refreshSensors()
     readTemperature();
     readPressure();
     readAmps();
-    
-    /*
-     // SRG dummy data when not connected to main controller board
-     _tempPreheat =   98.0;
-     _tempPostHeat = 110.0;
-     _tempPump =     150.0;
-     _ampsPump =       9.0;
-     _ampsHeater =    22.0;
-     _ampsBubbler =    5.0;
-     _Pressure =      15.0;
-     */
-    
+
+#ifdef TESTMODE
+   // create dummy data when if connected to main controller board
+   _tempPreheat =   98.0;
+   _tempPostHeat = 110.0;
+   _tempPump =     150.0;
+   _ampsPump =       9.0;
+   _ampsHeater =    22.0;
+   _ampsBubbler =    5.0;
+   _Pressure =      15.0;
+#endif
+
 } // refreshSensors()
 
 

@@ -53,15 +53,10 @@ From Main board to backback
 
 
 // === Libraries ===
-#include "Arduino.h"
-// #include <Button.h>       // For pushbuttons http://github.com/carlynorama/Arduino-Library-Button
-                                        // I modified button.h library so it would reset the pushbuttons.  Added onPressAsToggleRst() function
+#include <Arduino.h>
 #include <ST7565.h>      // LCD Library http://github.com/adafruit/ST7565-LCD  Tutorial: http://bit.ly/geIqhP, Data Sheet: http://bit.ly/19INf0S
 #include <Wire.h>
-
-
-// Include application, user and local libraries
-#include "Hot_Tub_LCD_Library.h"
+#include "Hot_Tub_LCD_Library.h"  // local libraries
 
 //=== Output for LEDs in pushbuttons ===
 #define ON_OFF_INDICATOR_OUTPUT_PIN   A0   // Shows if hot tub is on or off
