@@ -44,8 +44,8 @@ void HotTubControl::readPanelStatus()
     // Read pushbuttons status and temperature setpoint from user panel
     I2c.write(SLAVE_ID, CMD_ONOFF_BTN);
     delay(1);
-    I2c.read(SLAVE_ID, 1);                                           // request on/off button status
-    _hotTubBtn = I2c.receive();    // Read the on/off button status from slave
+    I2c.read(SLAVE_ID, 1);        // Request on/off button status
+    _hotTubBtn = I2c.receive();   // Read the on/off button status from slave
     
     I2c.write(SLAVE_ID, CMD_PUMP_BTN);
     delay(1);
@@ -65,15 +65,15 @@ void HotTubControl::readPanelStatus()
 } // readPanelStatus()
 
 
-// Send status to panel: current water temp, pump on, heat on, bubbles on
+// Send status to panel: current water temp, hot tub on/off status, output state for: pump, bubbler, heater
 void HotTubControl::writePanelStatus(float currentTemp, bool pumpState, bool bubbleState, bool heatState)
 {
     
     int i2cWriteDelay = 15;  // srg temp - may not need delay
     
     // Send data to User Panel via I2C bus
-    I2c.write( SLAVE_ID, ADR_ONOFF_STAT,  _hotTubBtn );
-    delay(i2cWriteDelay);
+//    I2c.write( SLAVE_ID, ADR_ONOFF_STAT,  _hotTubBtn );   // srg, I don't think I need to send this to user panel unless an alarm shuts down Hot Tub
+//    delay(i2cWriteDelay);
     I2c.write( SLAVE_ID, ADR_PUMP_STAT,   pumpState );
     delay(i2cWriteDelay);
     I2c.write( SLAVE_ID, ADR_BUBBLE_STAT, bubbleState );

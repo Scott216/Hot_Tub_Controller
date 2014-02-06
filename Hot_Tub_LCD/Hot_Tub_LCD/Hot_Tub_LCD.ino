@@ -1,11 +1,7 @@
 /*
 
-Board: Arduino Pro Mini 3.3 v
-
-
-directory: cd Dropbox/Arduino/Hot_Tub_Controller/ 
-
-
+Arduino Pro Mini 3.3 v
+I/0
 0 -  TX
 1 -  RX
 2 -  Encoder A
@@ -25,8 +21,8 @@ A0 - On/Off LED
 A1 - Pump LED
 A2 - Jets pushbutton (10kΩ pullup resistor)
 A3 - N/C
-A4 - I2C SDA (330Ω inline resistor to reduce volts)
-A5 - I2C SCL (330Ω inline resistor to reduce volts)
+A4 - I2C SDA
+A5 - I2C SCL
 A6 - Bubbler pushbutton (10kΩ pullup resistor)
 A7 - On/Off pushbutton (10kΩ pullup resistor)
 
@@ -35,14 +31,13 @@ Use 10k pull-up resistors on all buttons
 
 I2C data flow
 --------------------
-From backpack to main board
+From user panel to main board
  On/Off pushbutton state
  Jets pushbutton state
  Bubbler pushbutton state
- Encoder pushbutton state
- temperature setpoint 
+ Temperature setpoint
 
-From Main board to backback
+From Main board to user panel
  Hot tub on/off status
  pump on/off status
  bubbler on/off status
@@ -56,12 +51,12 @@ From Main board to backback
 #include <Arduino.h>
 #include <ST7565.h>      // LCD Library http://github.com/adafruit/ST7565-LCD  Tutorial: http://bit.ly/geIqhP, Data Sheet: http://bit.ly/19INf0S
 #include <Wire.h>
-#include "Hot_Tub_LCD_Library.h"  // local libraries
+#include "Hot_Tub_LCD_Library.h"  // local library
 
 //=== Output for LEDs in pushbuttons ===
-#define ON_OFF_INDICATOR_OUTPUT_PIN   A0   // Shows if hot tub is on or off
-#define PUMP_INDICATOR_OUTPUT_PIN     A1 
-#define BUBBLER_INDICATOR_OUTPUT_PIN  13 
+#define HOTTUB_ON_OFF_INDICATOR_OUTPUT_PIN   A0
+#define PUMP_INDICATOR_OUTPUT_PIN            A1
+#define BUBBLER_INDICATOR_OUTPUT_PIN         13
 
 // Pushbutton inputs are in LocalLibrary.h
 
@@ -81,13 +76,14 @@ From Main board to backback
 #define BACKLIGHT_BLU  11
 
 ST7565 glcd( LCD_SID, LCD_SCLK, LCD_A0, LCD_RST, LCD_CS);   // create LCD object
+const uint8_t CONTRAST = 0x18; 
 
 
-#define MINUTE 60000
+const uint32_t MINUTE = 60000UL;
 
 // Set Max and Min water temp settings with encoder
-#define WATER_TEMP_MAX     105
-#define WATER_TEMP_MIN      70
+const int WATER_TEMP_MAX = 105;
+const int WATER_TEMP_MIN  = 70;
 
 
 // Encoder setup
@@ -121,13 +117,14 @@ void doEncoderA();
 void doEncoderB();
 
 
+
 void setup()
 {
   
   Serial.begin(9600);
   
   // Define I/O pins.  Some I/O is defined in libraries
-  pinMode(ON_OFF_INDICATOR_OUTPUT_PIN,  OUTPUT);
+  pinMode(HOTTUB_ON_OFF_INDICATOR_OUTPUT_PIN,  OUTPUT);
   pinMode(PUMP_INDICATOR_OUTPUT_PIN,    OUTPUT);
   pinMode(BUBBLER_INDICATOR_OUTPUT_PIN, OUTPUT);
   pinMode(BACKLIGHT_RED,   OUTPUT);
@@ -144,7 +141,7 @@ void setup()
   EncoderSetup();
   
   // initialize LCD and set the contrast to 0x18
-  glcd.begin(0x18);
+  glcd.begin(CONTRAST);
   glcd.st7565_set_brightness(32);
   glcd.clear();
 
@@ -160,21 +157,27 @@ void setup()
 void loop()
 {
   
-  hottub.processButtons();   // Read button state and update on/off status of Hot tub, pump, bubbler lights inside the pushbuttons
+  byte btnStatus = hottub.processButtons();   // Read button state and update on/off status of Hot tub, pump, bubbler lights inside the pushbuttons
+  if ( btnStatus == HOT_TUB_TURNED_OFF )
+  {
+    // If hot tub is turned off hard reset the LCD display.  Sometime display gets messed up, this is a way to clear it
+    glcd.begin(CONTRAST);
+    glcd.st7565_set_brightness(32);
+ }
   
-   // Turn bubbles off after 15 minutes
-   if( (long)( millis() - hottub.getBubblerOnTime() ) > 15UL * MINUTE ) 
-   { hottub.setBubblerOff(); }
+  // Turn bubbles off after 15 minutes
+  if( (long)( millis() - hottub.getBubblerOnTime() ) > 15UL * MINUTE ) 
+  { hottub.setBubblerBtnOff(); }
   
   // Turn pump off after 30 minutes
   if( (long)(millis() - hottub.getPumpOnTime() ) > 30UL * MINUTE) 
-  { hottub.setPumpOff(); }
+  { hottub.setPumpBtnOff(); }
   
   
-  // Update pushbuttonbutton LEDs
-  digitalWrite( ON_OFF_INDICATOR_OUTPUT_PIN,  hottub.isHotTubOn() );
-  digitalWrite( PUMP_INDICATOR_OUTPUT_PIN,    hottub.isPumpOn() );
-  digitalWrite( BUBBLER_INDICATOR_OUTPUT_PIN, hottub.isBubblerOn() );
+  // Update pushbutton LEDs
+  digitalWrite( HOTTUB_ON_OFF_INDICATOR_OUTPUT_PIN,  hottub.isHotTubBtnOn() );
+  digitalWrite( PUMP_INDICATOR_OUTPUT_PIN,    hottub.isPumpBtnOn() );
+  digitalWrite( BUBBLER_INDICATOR_OUTPUT_PIN, hottub.isBubblerBtnOn() );
 
   
   // See if there is a new setpoint temperature from encoder.  Returns true if there is a new temperature setpoint
@@ -186,8 +189,8 @@ void loop()
 
   if ( isNewTempSetpoint == true )
   { UpdateDisplay(hottub.getWaterTempSetpoint(), "New Setpoint" ); }  // Display new temperature setpoint
-  else if ( hottub.isHotTubOn() == false )
-  { UpdateDisplay(hottub.getWaterTemp(), "HOT TUB IS OFF" );  }  //  // hot tub is off, send actual water temperature to display, but don't display setpoint
+  else if ( hottub.isHotTubBtnOn() == false )
+  { UpdateDisplay(hottub.getWaterTemp(), "HOT TUB IS OFF" );  }  // hot tub is off, send actual water temperature to display, but don't display setpoint
   else
   {
     // Hot tub is on, send actual water temperature to display
@@ -272,7 +275,7 @@ void UpdateDisplay(uint8_t temperature, char statusMsg[] )
     if( new_Bubbler == true )
     { glcd.drawstring(3, 0, "Bubble"); }
     if( new_Heater == true )
-    { glcd.drawstring(50, 0, "Heat"); }
+    { glcd.drawstring(57, 0, "Heat"); }
     if( new_Pump == true )
     { glcd.drawstring(100, 0, "Jets"); }
 
@@ -280,8 +283,8 @@ void UpdateDisplay(uint8_t temperature, char statusMsg[] )
     int leftPos = (128 - strlen(statusMsg) * 6) / 2;
     glcd.drawstring(leftPos, 7, statusMsg);
     
-    // Set LCD backlight color
-/*    Don't change backlight color based on temperature, this didn't work very well
+    /* // Set LCD backlight color
+    Don't change backlight color based on temperature, this didn't look very good
     int red = -7.2857 * (float) temperature + 765;
     if (temperature >= 105)
     { red = 0; }
@@ -289,10 +292,8 @@ void UpdateDisplay(uint8_t temperature, char statusMsg[] )
     { red = 255; }
     analogWrite(BACKLIGHT_RED, red);  // 0=on, 255=off
     analogWrite(BACKLIGHT_GRN, 255);
-    analogWrite(BACKLIGHT_BLU, 255 - red);
-*/
-  
-
+    analogWrite(BACKLIGHT_BLU, 255 - red);  */
+    
     glcd.display();
   }  // end something changed
   
@@ -342,7 +343,7 @@ bool refreshTempSetpoint()
   rotating = true;  // reset the debouncer
   
   // If hot tub is off don't change encoder position
-  if( hottub.isHotTubOn() == false )
+  if( hottub.isHotTubBtnOn() == false )
   { encoderTemp = oldEncoderTemp;  }
   
   // check to see if encoder was moved
