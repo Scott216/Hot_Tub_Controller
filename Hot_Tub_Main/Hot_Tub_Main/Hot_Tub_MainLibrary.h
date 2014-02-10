@@ -12,9 +12,9 @@ const int I2C_SUCCESS =   0; // When I2C read/writes are sucessful, function ret
 const int MAX_I2C_BYTES = 6; // Max I2C bytes to send data to slave
 
 
-// #define MEGA  // set this if using an Arduino Mega
-#define PANSTAMP // set this if using Panstamp
-#define TESTMODE // If not connected to controller, remove comment and this will create dummy sensor data
+#define MEGA  // set this if using an Arduino Mega
+//#define PANSTAMP // set this if using Panstamp
+//#define TESTMODE // If not connected to controller, remove comment and this will create dummy sensor data
 
 // Define I/0 Pins
 #ifdef MEGA

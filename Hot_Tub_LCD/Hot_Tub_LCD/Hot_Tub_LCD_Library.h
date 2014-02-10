@@ -1,6 +1,3 @@
-
-
-
 #ifndef LCD_Backpack_LCD_Library_h
 #define LCD_Backpack_LCD_Library_h
 
@@ -64,11 +61,11 @@ class HotTub
   static int  _tempActual;
   static byte _i2cCmd;
   static uint32_t _buttonChangeTime;
-  
+
 public:
   // Public restriction allows any part of the program, including parts outside the class,
   // to access the functions and variables specified as public.
-  HotTub();  // Constructor - called when the class is first called
+  HotTub();   // Constructor
   ~HotTub();  // Destructor
   void begin(); // setup pinMode
   bool isHotTubOn();

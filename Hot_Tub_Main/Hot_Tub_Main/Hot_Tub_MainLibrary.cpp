@@ -69,7 +69,7 @@ void HotTubControl::readPanelStatus()
 void HotTubControl::writePanelStatus(float currentTemp, bool pumpState, bool bubbleState, bool heatState)
 {
     
-    int i2cWriteDelay = 15;  // srg temp - may not need delay
+    int i2cWriteDelay = 1;  // srg temp - may not need delay.  was 15
     
     // Send data to User Panel via I2C bus
 //    I2c.write( SLAVE_ID, ADR_ONOFF_STAT,  _hotTubBtn );   // srg, I don't think I need to send this to user panel unless an alarm shuts down Hot Tub

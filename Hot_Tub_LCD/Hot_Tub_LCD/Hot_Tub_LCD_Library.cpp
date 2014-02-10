@@ -1,10 +1,9 @@
-//
 // Hot_Tub_LCDLibrary.cpp
-// Created by 	Scott Goldthwaite, 1/22/14 5:00 PM
+// Created by 	Scott Goldthwaite
 // License		GNU General Public License
 
-#include "Hot_Tub_LCD_Library.h"
 #include <Wire.h>
+#include "Hot_Tub_LCD_Library.h"
 
 // Static variables are like non-inline member functions in that they are declared in a class
 // declaration and defined in the corresponding source file. http://bit.ly/1djyt1S & http://ibm.co/1bxfbVy
@@ -23,12 +22,10 @@ uint32_t HotTub::_buttonChangeTime;
 uint32_t _lastI2cTime; // millis() timestamp of most recent I2C communication
 
 HotTub::HotTub()
-{
-}
+{}
 
 HotTub::~HotTub()
-{
-}
+{}
 
 void HotTub::begin()
 {

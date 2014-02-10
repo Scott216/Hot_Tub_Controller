@@ -1,7 +1,7 @@
 /*
 To do: 
 try different encoder code
-
+Can pushbuttons be in interrupts
 Have an alarm condition shut down Hot Tub
 
 */
@@ -73,7 +73,10 @@ void setup()
   display.setCursor(0,8);
   display.println(F("Finished setup()"));
   display.display();
+
+delay(3000); //srg
   Serial.println(F("Finished Hot Tub setup()"));
+
   
 } // setup()
 
@@ -120,7 +123,7 @@ void loop()
     last_alarm_check = millis();
   }
 
-//  PrintStatus();  // srg Print for debugging
+  PrintStatus();  // srg Print for debugging
 
   // Turn off pump
   bool coolDownTimerExpired = (long)(millis() - heater_cooldown_timer) > 0;  // runs water past heater after heater is off so it will cool down
@@ -349,7 +352,8 @@ void OutputAlarm(char AlarmText[])
 
 void PrintStatus()
 { 
-  PrintPumpInfo();
+//  PrintPumpInfo();
+  PrintStatusAll();
 } // PrintStatus()
 
 
@@ -412,9 +416,7 @@ void PrintPumpInfo()
     
     Serial.println();  
   }
-  
-  
-}
+} // PrintPumpInfo()
 
 
 //============================================================================
@@ -431,7 +433,7 @@ void PrintStatusAll()
     //Print Pushbutton state and Led indicator state
     if(cntHeading > 40 || millis() < 1000)
     {
-      Serial.println(F("OnOff\tPump\tHeat\tA-temp\tsetpt\tbubble\tT1\tT2\tT3\tpres\tampH\tampP\tampB\tHtOnTm"));
+      Serial.println(F("OnOff\tPump\tHeat\tair\tsetPt\tT1\tT2\tT3\tpres\tampH\tampP\tampB\tHtrChngTm"));
       cntHeading = 0;
     }
     cntHeading++;
@@ -443,18 +445,16 @@ void PrintStatusAll()
     Serial.print(digitalRead(PUMP_ON_OFF_OUTPUT_PIN));
     Serial.print(F("\t"));
     
-    Serial.print(digitalRead(HEATER_ON_OFF_OUTPUT_PIN));
+    Serial.print(NeedHeat());
     Serial.print(needHeatStatus);
-    Serial.print(F("\t"));
-
-    Serial.print(hotTubControl.getTempPreHeat());
-    Serial.print(F("\t"));
-
-    Serial.print(hotTubControl.getTempSetpoint());
+    Serial.print(digitalRead(HEATER_ON_OFF_OUTPUT_PIN));
     Serial.print(F("\t"));
 
     Serial.print(hotTubControl.isBubbleBtnOn());
     Serial.print(digitalRead(BUBBLER_ON_OFF_OUTPUT_PIN));
+    Serial.print(F("\t"));
+
+    Serial.print(hotTubControl.getTempSetpoint());
     Serial.print(F("\t"));
 
     Serial.print(hotTubControl.getTempPreHeat());
