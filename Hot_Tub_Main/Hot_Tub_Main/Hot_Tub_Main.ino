@@ -18,9 +18,9 @@ Have an alarm condition shut down Hot Tub
 
 // Create HotTubController instance
 HotTubControl hotTubControl;
-// srg see if this works: HotTubControl *hotTubControl = new HotTubControl();
 
-uint32_t heaterChangeTime =   0;  // Records time heater state changed.  Used to keep heat on or off for at least 2 minutes
+
+uint32_t heaterChangeTime = 0;  // Records time heater state changed.  Used to keep heat on or off for at least 2 minutes
 
 bool needHeatStatus = false;  // Saves NeedHeat() status, used so the NeedHeat() function is not called every time sketch wants to know if it needs heat
 
@@ -74,9 +74,7 @@ void setup()
   display.println(F("Finished setup()"));
   display.display();
 
-delay(3000); //srg
-  Serial.println(F("Finished Hot Tub setup()"));
-
+  Serial.println(F("Finished Hot Tub Main Setup()"));
   
 } // setup()
 
@@ -109,9 +107,15 @@ void loop()
     last_sensor_check = millis();
     hotTubControl.refreshSensors();
 
-    // If heater has changed state in the last 3 minutes or less, don't check yet. This is used to keep heater from going on/off too quickly
-    if ( (long)(millis() - heaterChangeTime ) > 3UL * 60000UL )  
-    { needHeatStatus = NeedHeat(); } // 3 mintues has passed, okay to check NeedHeat()
+    // Once heaterChangeTime timer has expired see if needHeatStatus has changed
+    // This prevents heater from cycling too quickly.  Once the heater comes on, it will stay on for at least 1 minute
+    if ( (long)(millis() - heaterChangeTime ) >  60000UL )  
+    {
+      bool oldneedHeatStatus = needHeatStatus;
+      needHeatStatus = NeedHeat(); 
+      if ( needHeatStatus != oldneedHeatStatus )
+      {  heaterChangeTime = millis(); }  // needHeatStatus has changed, start timer to prevent status changing again too quickly
+    }
     
     updateDisplay();
   }
@@ -148,22 +152,17 @@ void loop()
   bool heaterAmpsOK = hotTubControl.getAmpsHeater() <= ALARM_HEATER_AMPS_HIGH; 
   if ( hotTubControl.isHotTubBtnOn() && pumpIsRunning && needHeatStatus && heaterAmpsOK ) 
   { // Turn on heater
-  
-    // If heater is changing state from off to on, reset heaterChangeTime 
-    if ( digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == LOW )
-    { heaterChangeTime = millis(); }       
-    
+      
     digitalWrite(HEATER_ON_OFF_OUTPUT_PIN, HIGH);
     heater_cooldown_timer = millis() + HEATER_COOLDOWN_DELAY; 
   }
   else // Turn off heater
   {
-    // If heater is changing state from on to off, reset heaterChangeTime
+    // If heater is changing from on to off, reset needHeatStatus to false since 
+    // needHeatStatus may not be updated right away because of the heaterChangeTimen delay
     if ( digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == HIGH )
-    { 
-      heaterChangeTime = millis(); 
-      needHeatStatus = false; // Set needHeatStatus to false since it won't be checked for 3 minutes  srg - not sure if I need this
-    }
+    {  needHeatStatus = false; } // Set needHeatStatus to false since it won't be checked for 3 minutes
+ 
     digitalWrite(HEATER_ON_OFF_OUTPUT_PIN, LOW); 
   }
   
