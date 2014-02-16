@@ -151,6 +151,8 @@ void setup()
   encoderTemp = hottub.getWaterTempDefault();                
   oldEncoderTemp = hottub.getWaterTempDefault();              
   
+  Serial.println("Hot tub panel setup()");
+  
 } // setup()
 
 
