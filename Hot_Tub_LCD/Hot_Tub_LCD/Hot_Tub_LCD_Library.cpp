@@ -48,70 +48,37 @@ void HotTub::begin()
 // Returns true if any pushbutton press was detected
 byte HotTub::processButtons()
 {
+  byte returnStatus = false;
   
-  if ( (long) (millis() - _debounceTimout) < 0 )
-  { return false; } // Haven't waited past debounce delay. Just exit
-  
-  // Check On/Off button.  If hot tub is on, turn it off and visa-versa
   if( analogRead(HOT_TUB_BUTTON_INPUT_PIN) < 100 )
-  {
-    _debounceTimout = millis() + debounceDelay;
-    _buttonChangeTime = millis();  // time button was pressed
-    if ( isHotTubBtnOn() )
-    { 
-      setHotTubBtnOff(); 
-      return HOT_TUB_TURNED_OFF;  
-    }
-    else
-    { 
-      setHotTubBtnOn(); 
-      return 2; 
-    }
+  { setHotTubBtnOn(); }
+  else
+  { 
+    if ( isHotTubOn() )
+    { returnStatus = HOT_TUB_TURNED_OFF; } // Hot tub went from On to Off
+    setHotTubBtnOff(); 
   }
   
   // Check Pump button
   if( digitalRead(JETS_BUTTON_INPUT_PIN) == BTN_ON )
-  {
-    _debounceTimout = millis() + debounceDelay;
-    _buttonChangeTime = millis();  // time button was pressed
-    if ( isPumpBtnOn() )
-    { 
-       setPumpBtnOff();
-       return 3;
-    }
-    else
-    {
-      setPumpBtnOn();
-      return 4;
-    }
-  }
+  { setPumpBtnOn(); }
+  else
+  { setPumpBtnOff(); }
   
   // Check Bubbler button
   if( analogRead(BUBBLER_BUTTON_INPUT_PIN) < 100 )
-  {
-    _debounceTimout = millis() + debounceDelay;
-    _buttonChangeTime = millis();  // time button was pressed
-    if (isBubblerBtnOn())
-    { 
-      setBubblerBtnOff();
-      return 5;
-    }
-    else
-    { 
-      setBubblerBtnOn();
-      return 6; 
-    }
-  }
-  
+  { setBubblerBtnOn(); }
+  else
+  { setBubblerBtnOff(); }
+
   // Check encoder pushbutton - invert display
-  if( digitalRead(ENCODERPB) == BTN_ON )
+  if( digitalRead(ENCODERPB) == BTN_ON && (long)(millis() - _debounceTimout) > 0 )
   {
     _debounceTimout = millis() + debounceDelay;
-    _isDisplayInverted = !_isDisplayInverted;  // toggle display
-    return 7;
+    _isDisplayInverted = !_isDisplayInverted;  // toggle LCD display
   }
   
-  return false; // no buttons pressed
+  return returnStatus; 
   
 }  // processButtons()
 
