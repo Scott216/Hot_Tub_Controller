@@ -1,8 +1,10 @@
 /*
 To do: 
 try different encoder code
-Can pushbuttons be in interrupts
+Can pushbuttons be in interrupts - yes
 Have an alarm condition shut down Hot Tub
+Have pump come on for 30 seconds before heat comes on just to make sure hot tub really needs heat
+Put turning heater, pump and bubbler functions in class, currently it's done with digitalWrite in the ino file
 
 */
 
@@ -19,10 +21,9 @@ Have an alarm condition shut down Hot Tub
 // Create HotTubController instance
 HotTubControl hotTubControl;
 
-
-uint32_t heaterChangeTime = 0;  // Records time heater state changed.  Used to keep heat on or off for at least 2 minutes
-
-bool needHeatStatus = false;  // Saves NeedHeat() status, used so the NeedHeat() function is not called every time sketch wants to know if it needs heat
+// Values for NeedHestStatus
+enum needHeatStatus_t { DONT_NEED_HEAT, PRE_HEAT_CHECK, NEED_HEAT };
+needHeatStatus_t needHeatStatus = DONT_NEED_HEAT; 
 
 // Alarm setpoints
 #define ALARM_HEATER_AMPS_HIGH   30  // Max heater amps allowed
@@ -89,42 +90,55 @@ void loop()
   const uint32_t SENSOR_CHECK_INTERVAL =    1000;  // Check sensor every second
   const uint32_t BUBBLER_ON_DELAY =          700;  // Delay before bubbler can be turned on again after being off
   const uint32_t HEATER_COOLDOWN_DELAY =   10000;  // When heater is turned off, keep pump running a few seconds to help heating coils cool down
+  const uint32_t MIN_HEATER_ON_TIME    =   60000;  // Minimum time heater will stay on
   
-  static uint32_t last_sensor_check =           0;  // Timer used to read sensor values every second
-  static uint32_t last_alarm_check =            0;  // Timer used to check alarms every few seconds
-  static uint32_t lastPumpOnTime; // Millis() Timestamp of when pump was last turned on.
-                                  // Updates every cycle that pump should be on.  Used to keep pump from cycling on/off too fast
-  static uint32_t last_bubbler_on_check = 0;  // Timer used to prevent bubbler from being switched on too quickly
-  static uint32_t heater_cooldown_timer = 0;  // Timer used to keep pump on for a few seconds after heater has turned off
+  static uint32_t lastSensorCheck =        0;  // Timer used to read sensor values every second
+  static uint32_t lastAlarmCheck =         0;  // Timer used to check alarms every few seconds
+  static uint32_t lastPumpOnTime;              // Millis() Timestamp of when pump was last turned on.
+                                               // Updates every cycle that pump should be on.  Used to keep pump from cycling on/off too fast
+  static uint32_t last_bubbler_on_check =  0;  // Timer used to prevent bubbler from being switched on too quickly
+  static uint32_t heater_cooldown_timer =  0;  // Timer used to keep pump on for a few seconds after heater has turned off
+  static uint32_t pre_heat_pump_on_timer = 0;  // Timer used to turn pump on a few seconds to verify we actually need heat
 
   // Read pushbuttons status and temperature setpoint from user panel
   hotTubControl.readPanelStatus();
 
   
   // Check sensor inputs
-  if ((long)(millis() - last_sensor_check) > SENSOR_CHECK_INTERVAL)
+  if ((long)(millis() - lastSensorCheck) > SENSOR_CHECK_INTERVAL)
   {
-    last_sensor_check = millis();
+    lastSensorCheck = millis();
     hotTubControl.refreshSensors();
 
-    // Once heaterChangeTime timer has expired see if needHeatStatus has changed
-    // This prevents heater from cycling too quickly.  Once the heater comes on, it will stay on for at least 1 minute
-    if ( (long)(millis() - heaterChangeTime ) >  60000UL )  
+    if (digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == LOW && NeedHeat() && needHeatStatus == DONT_NEED_HEAT )
     {
-      bool oldneedHeatStatus = needHeatStatus;
-      needHeatStatus = NeedHeat(); 
-      if ( needHeatStatus != oldneedHeatStatus )
-      {  heaterChangeTime = millis(); }  // needHeatStatus has changed, start timer to prevent status changing again too quickly
+      // Pump is off, and we need heat, start timer that makes pump run to a little bit before we turn on heat
+      pre_heat_pump_on_timer = millis() + 15000; 
+      needHeatStatus = PRE_HEAT_CHECK; 
     }
+    
+    bool pre_heat_pump_on_timer_expired = (long) (millis() - pre_heat_pump_on_timer) > 0;
+    if ( pre_heat_pump_on_timer_expired && needHeatStatus == PRE_HEAT_CHECK )
+    {
+      // Now that pump has been on for a few seconds, see if hot tub still needs heat
+      if ( NeedHeat() )
+      { needHeatStatus = NEED_HEAT; }
+      else
+      { needHeatStatus = DONT_NEED_HEAT; } 
+    }
+    
+    // If water has reached setpoint, change needHeatStatus so pump and heater turn off
+    if ( needHeatStatus == NEED_HEAT && !NeedHeat() )
+    { needHeatStatus = DONT_NEED_HEAT; }
     
     updateDisplay();
   }
   
   // Check alarms
-  if ((long)(millis() - last_alarm_check) > ALARM_CHECK_INTERVAL)
+  if ((long)(millis() - lastAlarmCheck) > ALARM_CHECK_INTERVAL)
   {
     CheckAlarms();
-    last_alarm_check = millis();
+    lastAlarmCheck = millis();
   }
 
   PrintStatus();  // srg Print for debugging
@@ -133,13 +147,13 @@ void loop()
   bool coolDownTimerExpired = (long)(millis() - heater_cooldown_timer) > 0;  // runs water past heater after heater is off so it will cool down
   if ( coolDownTimerExpired )
   {
-    if ( !hotTubControl.isHotTubBtnOn() || ( !hotTubControl.isPumpBtnOn() && !needHeatStatus) )
+    if ( !hotTubControl.isHotTubBtnOn() || ( !hotTubControl.isPumpBtnOn() && needHeatStatus == DONT_NEED_HEAT ) )
     { digitalWrite(PUMP_ON_OFF_OUTPUT_PIN, LOW); }
   }
   
   // Turn on pump
   bool pumpOnDelayTimerExpired = (long)(millis() - lastPumpOnTime) > PUMP_ON_DELAY;  // Timer used to prevent pump from cycling too quickly
-  bool needPump = hotTubControl.isPumpBtnOn() || needHeatStatus; // Either button or heater needs pump turned on
+  bool needPump = hotTubControl.isPumpBtnOn() || needHeatStatus != DONT_NEED_HEAT; // Either button or heater needs pump turned on
   if( hotTubControl.isHotTubBtnOn() && needPump && pumpOnDelayTimerExpired )
   {
     digitalWrite(PUMP_ON_OFF_OUTPUT_PIN, HIGH);
@@ -148,20 +162,19 @@ void loop()
 
 
   // Heater control
-  bool pumpIsRunning =  digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == HIGH && hotTubControl.getAmpsPump() >= PUMP_AMPS_THRESHOLD && hotTubControl.getPressure() >= PUMP_PRESSURE_THRESHOLD;
+  bool pumpIsRunning = digitalRead(PUMP_ON_OFF_OUTPUT_PIN) == HIGH && hotTubControl.getAmpsPump() >= PUMP_AMPS_THRESHOLD && hotTubControl.getPressure() >= PUMP_PRESSURE_THRESHOLD;
   bool heaterAmpsOK = hotTubControl.getAmpsHeater() <= ALARM_HEATER_AMPS_HIGH; 
-  if ( hotTubControl.isHotTubBtnOn() && pumpIsRunning && needHeatStatus && heaterAmpsOK ) 
+  if ( hotTubControl.isHotTubBtnOn() && pumpIsRunning && needHeatStatus == NEED_HEAT && heaterAmpsOK ) 
   { // Turn on heater
-      
     digitalWrite(HEATER_ON_OFF_OUTPUT_PIN, HIGH);
     heater_cooldown_timer = millis() + HEATER_COOLDOWN_DELAY; 
   }
   else // Turn off heater
   {
     // If heater is changing from on to off, reset needHeatStatus to false since 
-    // needHeatStatus may not be updated right away because of the heaterChangeTimen delay
+    // needHeatStatus may not be updated right away
     if ( digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == HIGH )
-    {  needHeatStatus = false; } // Set needHeatStatus to false since it won't be checked for 3 minutes
+    {  needHeatStatus = DONT_NEED_HEAT; } // Set needHeatStatus since it won't be checked right away
  
     digitalWrite(HEATER_ON_OFF_OUTPUT_PIN, LOW); 
   }
@@ -368,7 +381,7 @@ void printHeaterInfo()
     //Print Pushbutton state and Led indicator state
     if(cntHeading > 30 || millis() < 1000)
     {
-      Serial.println(F("Need\tstat\ttemp\ttmr"));
+      Serial.println(F("Need\tstat\ttemp"));
       cntHeading = 0;
     }
     cntHeading++;
@@ -378,9 +391,6 @@ void printHeaterInfo()
     Serial.print(needHeatStatus);
     Serial.print("\t");
     Serial.print(hotTubControl.getTempPreHeat());
-    Serial.print("\t");
-    Serial.print((millis() - heaterChangeTime)/1000UL );
-    Serial.print("\t");
     
     Serial.println();  
   }
@@ -432,7 +442,7 @@ void PrintStatusAll()
     //Print Pushbutton state and Led indicator state
     if(cntHeading > 40 || millis() < 1000)
     {
-      Serial.println(F("OnOff\tPump\tHeat\tair\tsetPt\tT1\tT2\tT3\tpres\tampH\tampP\tampB\tHtrChngTm"));
+      Serial.println(F("OnOff\tPump\tHeat\tair\tsetPt\tT1\tT2\tT3\tpres\tampH\tampP\tampB\tRunTimeMin"));
       cntHeading = 0;
     }
     cntHeading++;
@@ -470,8 +480,8 @@ void PrintStatusAll()
     Serial.print(F("\t"));
     Serial.print(hotTubControl.getAmpsBubbler());
     Serial.print(F("\t"));
-    Serial.print((millis() - heaterChangeTime)/1000UL);
-    
+    Serial.print(millis()/60000UL);
+
     Serial.println("");
   }
 }  // PrintStatusAll()
