@@ -213,9 +213,10 @@ bool HotTub::isDisplayInverted()
 }
 
 // Compares the last time there was I2C communication to the threshold and returns true if it timed out
-bool isI2cTimeout(int threshold)
+// threshold parameter is the number of seconds to test
+bool HotTub::isI2cTimeout(int threshold)
 {
-  if ( (millis() - _lastI2cTime) > (threshold * 1000) )
+  if ( (millis() - _lastI2cTime) > ((long)threshold * 1000UL) )
   { return true; }  // I2C timed out
   else
   { return false; } // I2C ok

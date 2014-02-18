@@ -186,9 +186,7 @@ void loop()
   bool isNewTempSetpoint = refreshTempSetpoint();
 
   // update LCD display
-  // UpdateDisplay() will check to see if anything has changed before it sends new data to the display
   char LCDMsg[25];
-
   if ( isNewTempSetpoint == true )
   { UpdateDisplay(hottub.getWaterTempSetpoint(), "New Setpoint" ); }  // Display new temperature setpoint
   else if ( hottub.isHotTubBtnOn() == false )
@@ -196,7 +194,13 @@ void loop()
   else
   {
     // Hot tub is on, send actual water temperature to display
-    sprintf(LCDMsg, "Setpoint = %d",  hottub.getWaterTempSetpoint()); 
+    bool I2C_is_okay = !hottub.isI2cTimeout(60);
+    if ( I2C_is_okay )
+    { sprintf(LCDMsg, "Setpoint = %d",  hottub.getWaterTempSetpoint()); }
+    else
+    { strcpy(LCDMsg, "Lost Communication"); }
+    
+    // UpdateDisplay() will check to see if anything has changed before it sends new data to the display
     UpdateDisplay(hottub.getWaterTemp(), LCDMsg );
   }
 
