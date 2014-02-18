@@ -38,6 +38,8 @@ const int MAX_I2C_BYTES = 6; // Max I2C bytes to send data to slave
 #endif
 
 #ifdef PANSTAMP
+// I/O used: Analog: 0,1,2,3,6   Digital: 3,4,5,6,7 
+
 //=== Analog Inputs for CTs measuring current ===
 #define CT_PUMP       0  // Pump amps input 20 Amp CT
 #define CT_HEATER1    1  // Heater leg 1 amps, 50 Amp CT
@@ -59,7 +61,8 @@ const int MAX_I2C_BYTES = 6; // Max I2C bytes to send data to slave
 
 
 // I2C Commands to read data from LED backpack user panel
-enum {
+enum 
+{
   CMD_SAVE_ALL    =  1,  // writes all data from Mater to slave - not used
   CMD_SLAVE_ID    =  2,  // commands slave to return slave ID
   CMD_ONOFF_BTN   =  3,  // commands slave to return on/off button status
