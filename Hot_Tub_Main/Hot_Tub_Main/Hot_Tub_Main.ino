@@ -3,7 +3,6 @@ To do:
 try different encoder code
 Can pushbuttons be in interrupts - yes
 Have an alarm condition shut down Hot Tub
-Have pump come on for 30 seconds before heat comes on just to make sure hot tub really needs heat
 Put turning heater, pump and bubbler functions in class, currently it's done with digitalWrite in the ino file
 
 */
@@ -90,7 +89,6 @@ void loop()
   const uint32_t SENSOR_CHECK_INTERVAL =    1000;  // Check sensor every second
   const uint32_t BUBBLER_ON_DELAY =          700;  // Delay before bubbler can be turned on again after being off
   const uint32_t HEATER_COOLDOWN_DELAY =   10000;  // When heater is turned off, keep pump running a few seconds to help heating coils cool down
-  const uint32_t MIN_HEATER_ON_TIME    =   60000;  // Minimum time heater will stay on
   
   static uint32_t lastSensorCheck =        0;  // Timer used to read sensor values every second
   static uint32_t lastAlarmCheck =         0;  // Timer used to check alarms every few seconds
@@ -209,7 +207,7 @@ void loop()
 boolean NeedHeat()
 {
   float upperLimit = (float) hotTubControl.getTempSetpoint() + 0.4;
-  float lowerLimit = (float) hotTubControl.getTempSetpoint() - 0.4;
+  float lowerLimit = (float) hotTubControl.getTempSetpoint() - 0.8;
 
   if( digitalRead(HEATER_ON_OFF_OUTPUT_PIN) == HIGH && hotTubControl.getTempPreHeat() < upperLimit )
   { return true; } // Heater is on and hasn't reached upper limit yet

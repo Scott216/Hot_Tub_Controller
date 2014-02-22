@@ -169,7 +169,6 @@ void HotTubControl::readPressure()
 } // readPressure()
 
 
-
 // Read amps sensors
 // Average 25 samples
 void HotTubControl::readAmps()
@@ -180,12 +179,12 @@ void HotTubControl::readAmps()
     float heater_amps =  0.0;
     float bubbler_amps = 0.0;
     int samples;
-    
+
     for (samples = 0; samples < 25; samples++)
     {
         // Get Amps from CTs
-        pump_amps    += analogRead(CT_PUMP);  // ADC value for pump is about 630
-        heater_amps  += (analogRead(CT_HEATER1) + analogRead(CT_HEATER2)) / 2.0;  // There are 2 CTs for the heater, take average.  Each one should read about 22.8 amps
+        pump_amps    += analogRead(CT_PUMP);    // ADC value for pump is about 630
+        heater_amps  += analogRead(CT_HEATER);  // Should read about 22.8 amps
         bubbler_amps += analogRead(CT_BUBBLER);
         delay(1);
     }

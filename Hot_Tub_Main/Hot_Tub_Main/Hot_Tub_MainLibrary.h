@@ -20,8 +20,7 @@ const int MAX_I2C_BYTES = 6; // Max I2C bytes to send data to slave
 #ifdef MEGA
 //=== Analog Inputs for CTs measuring current ===
 #define CT_PUMP       8  // Pump amps input 20 Amp CT
-#define CT_HEATER1    9  // Heater leg 1 amps, 50 Amp CT
-#define CT_HEATER2   10  // Heater leg 2 amps, 50 Amp CT
+#define CT_HEATER    10  // Heater leg 1 amps, 50 Amp CT
 #define CT_BUBBLER   11  // Bubbler amps, 20 Amp CT
 
 //===Analog Inputs from Pressure===
