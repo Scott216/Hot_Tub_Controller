@@ -1,6 +1,6 @@
 // Hot_Tub_LCDLibrary.cpp
-// Created by 	Scott Goldthwaite
-// License		GNU General Public License
+// Created by Scott Goldthwaite
+// License GNU General Public License
 
 #include <Wire.h>
 #include "Hot_Tub_LCD_Library.h"
@@ -196,7 +196,7 @@ int HotTub::getWaterTempDefault()
 }
 
 
-void HotTub::setWaterTemp(int tempSetpoint)
+void HotTub::setWaterTemp(float tempSetpoint)
 {
   _tempSetpoint = tempSetpoint;
 }

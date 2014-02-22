@@ -27,7 +27,7 @@ A6 - Bubbler pushbutton (10kΩ pullup resistor)
 A7 - On/Off pushbutton (10kΩ pullup resistor)
 
 Pushbuttons have built-in resistor for LED
-Use 10k pull-up resistors on all buttons 
+Use 10k pull-up resistors on all buttons inputs
 
 I2C data flow
 --------------------
@@ -77,8 +77,6 @@ From Main board to user panel
 
 ST7565 glcd( LCD_SID, LCD_SCLK, LCD_A0, LCD_RST, LCD_CS);   // create LCD object
 const uint8_t CONTRAST = 0x18; 
-
-
 const uint32_t MINUTE = 60000UL;
 
 // Set Max and Min water temp settings with encoder
@@ -95,8 +93,8 @@ enum PinAssignments
   interruptB  = 1    // Interrupt number for encoderPinB
 };
 
-volatile unsigned int encoderTemp;  // counter for the dial  http://arduino.cc/en/Reference/Volatile
-unsigned int oldEncoderTemp;        // change management
+volatile float encoderTemp;  // counter for the dial  http://arduino.cc/en/Reference/Volatile
+float oldEncoderTemp;        // change management
 boolean rotating = false;           // debounce management
 uint32_t encoderChangeTime;         // timestamp encoder value was last changed
 
@@ -107,7 +105,6 @@ boolean B_set = false;
 // Create hottub object
 HotTub hottub;
   
-
 // Define Function Prototypes
 void ReadInputButtons();
 void EncoderSetup();
@@ -117,10 +114,8 @@ void doEncoderA();
 void doEncoderB();
 
 
-
 void setup()
 {
-  
   Serial.begin(9600);
   
   // Define I/O pins.  Some I/O is defined in libraries
@@ -132,10 +127,10 @@ void setup()
   pinMode(BACKLIGHT_BLU,   OUTPUT);
   pinMode(ENCODERPB, INPUT_PULLUP);
 
-    // LED Color, 0=on, 255=off
-    analogWrite(BACKLIGHT_RED, 0); 
-    analogWrite(BACKLIGHT_GRN, 0);
-    analogWrite(BACKLIGHT_BLU, 0);
+  // LED Color, 0=on, 255=off
+  analogWrite(BACKLIGHT_RED, 0); 
+  analogWrite(BACKLIGHT_GRN, 0);
+  analogWrite(BACKLIGHT_BLU, 0);
 
   // Initialize Encoder pins
   EncoderSetup();
@@ -152,20 +147,18 @@ void setup()
   oldEncoderTemp = hottub.getWaterTempDefault();              
   
   Serial.println("Hot tub panel setup()");
-  
 } // setup()
 
 
 void loop()
 {
-  
   byte btnStatus = hottub.processButtons();   // Read button state and update on/off status of Hot tub, pump, bubbler lights inside the pushbuttons
   if ( btnStatus == HOT_TUB_TURNED_OFF )
   {
     // If hot tub is turned off hard reset the LCD display.  Sometime display gets messed up, this is a way to clear it
     glcd.begin(CONTRAST);
     glcd.st7565_set_brightness(32);
- }
+  }
   
   // Turn bubbles off after 15 minutes
   if( (long)( millis() - hottub.getBubblerOnTime() ) > 15UL * MINUTE ) 
@@ -175,13 +168,11 @@ void loop()
   if( (long)(millis() - hottub.getPumpOnTime() ) > 30UL * MINUTE) 
   { hottub.setPumpBtnOff(); }
   
-  
   // Update pushbutton LEDs
   digitalWrite( HOTTUB_ON_OFF_INDICATOR_OUTPUT_PIN,  hottub.isHotTubBtnOn() );
   digitalWrite( PUMP_INDICATOR_OUTPUT_PIN,    hottub.isPumpBtnOn() );
   digitalWrite( BUBBLER_INDICATOR_OUTPUT_PIN, hottub.isBubblerBtnOn() );
 
-  
   // See if there is a new setpoint temperature from encoder.  Returns true if there is a new temperature setpoint
   bool isNewTempSetpoint = refreshTempSetpoint();
 
@@ -203,9 +194,7 @@ void loop()
     // UpdateDisplay() will check to see if anything has changed before it sends new data to the display
     UpdateDisplay(hottub.getWaterTemp(), LCDMsg );
   }
-
 } // loop()
-
 
 
 // Update display with temperature and status messages
@@ -319,7 +308,6 @@ void UpdateDisplay(uint8_t temperature, char statusMsg[] )
 //*********************************************************************************
 void EncoderSetup()
 {
-  
   pinMode(encoderPinA, INPUT);
   pinMode(encoderPinB, INPUT);
   
@@ -327,10 +315,10 @@ void EncoderSetup()
   digitalWrite(encoderPinA, HIGH);
   digitalWrite(encoderPinB, HIGH);
   
-    // encoder pin on interrupt 0 (pin 2)
+  // encoder pin on interrupt 0 (pin 2)
   attachInterrupt(interruptA, doEncoderA, CHANGE);
   
-    // encoder pin on interrupt 1 (pin 3)
+  // encoder pin on interrupt 1 (pin 3)
   attachInterrupt(interruptB, doEncoderB, CHANGE);
   
 } // EncoderSetup()
@@ -356,13 +344,6 @@ bool refreshTempSetpoint()
   // If so, reset heater on delay interval so heater can come on right away
   if (oldEncoderTemp != encoderTemp)
   {
-
-/* SRG - move back to main sketch    
-    if (millis() < HEATER_ON_DELAY)
-    {last_heater_on_check = 0;}  // millis is too small to subtract HEATER_ON_DELAY
-    else
-    {last_heater_on_check = millis() - HEATER_ON_DELAY + 1000;} // Make heater delay 1 second after encoder is moved
-*/    
     oldEncoderTemp = encoderTemp;
     isNewTempSetpoint = true; // Used by LCD display
     newSetpointDisplayDelay = millis();
@@ -376,7 +357,7 @@ bool refreshTempSetpoint()
     hottub.setWaterTemp(encoderTemp); // Save new water temp setpoint
   }
   else
- { 
+  { 
     // after a 2 second delay, reset isNewTempSetpoint flag  
     // this is used so display doesn't revert back to showing actual temperature while user is 
     // rotating encoder 
@@ -384,11 +365,12 @@ bool refreshTempSetpoint()
     { isNewTempSetpoint = false; }
     else
     { isNewTempSetpoint = true; }
- }
+  }
  
   return isNewTempSetpoint;
   
 } // refreshTempSetpoint()
+
 
 //*********************************************************************************
 // Interrupt on A changing state
@@ -408,12 +390,13 @@ void doEncoderA()
     // and if 200mS since last encoder change has passed
     if ( A_set && !B_set && (long)(millis() - encoderChangeTime) > 200 )
     { 
-      encoderTemp++;
+      encoderTemp = encoderTemp + 0.25;
       encoderChangeTime = millis(); // record time encoder value changed
     }
     rotating = false;  // no more debouncing until loop() hits again
   }
 } //doEncoderA()
+
 
 //*********************************************************************************
 // Interrupt on B changing state, same as A above
@@ -432,7 +415,7 @@ void doEncoderB()
     // and if 200mS since last encoder change has passed
     if( B_set && !A_set && (long)(millis() - encoderChangeTime) > 200 )
     {
-      encoderTemp--;
+      encoderTemp = encoderTemp - 0.25;
       encoderChangeTime = millis(); // record time encoder value changed
     }
     rotating = false;

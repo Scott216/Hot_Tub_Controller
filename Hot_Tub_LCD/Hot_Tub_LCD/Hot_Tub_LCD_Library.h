@@ -87,7 +87,7 @@ public:
   byte processButtons(); // read inputs for pushbuttons including encoder pushbutton, return value indicates which button was turned on or off
   int  getWaterTemp();
   int  getWaterTempDefault();
-  void setWaterTemp(int tempSetpoint);
+  void setWaterTemp(float tempSetpoint);
   int  getWaterTempSetpoint();
   bool isI2cTimeout(int threshold);  // compares last time there was I2C communication to threshold
   
