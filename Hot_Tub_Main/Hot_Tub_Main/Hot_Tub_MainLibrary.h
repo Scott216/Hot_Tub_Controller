@@ -12,8 +12,8 @@ const int I2C_SUCCESS =   0; // When I2C read/writes are sucessful, function ret
 const int MAX_I2C_BYTES = 6; // Max I2C bytes to send data to slave
 
 
-#define MEGA  // set this if using an Arduino Mega
-//#define PANSTAMP // set this if using Panstamp
+// #define MEGA  // set this if using an Arduino Mega
+#define PANSTAMP // set this if using Panstamp
 //#define TESTMODE // If not connected to controller, remove comment and this will create dummy sensor data
 
 // Define I/0 Pins
@@ -41,8 +41,7 @@ const int MAX_I2C_BYTES = 6; // Max I2C bytes to send data to slave
 
 //=== Analog Inputs for CTs measuring current ===
 #define CT_PUMP       0  // Pump amps input 20 Amp CT
-#define CT_HEATER1    1  // Heater leg 1 amps, 50 Amp CT
-#define CT_HEATER2    2  // Heater leg 2 amps, 50 Amp CT
+#define CT_HEATER     1  // Heater amps, 50 Amp CT
 #define CT_BUBBLER    3  // Bubbler amps, 20 Amp CT
 
 //===Analog Inputs from Pressure===
