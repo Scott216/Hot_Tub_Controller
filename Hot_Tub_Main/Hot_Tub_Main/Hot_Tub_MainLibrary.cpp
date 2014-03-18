@@ -161,7 +161,7 @@ void HotTubControl::readPressure()
     }
     
     // Calculate averages from samples
-    _Pressure = ( pressure / (float)samples ) * 0.0377 - 7.5094 + 0.25;   // 0.25 PSI calibration offset
+    _Pressure = ( pressure / (float) samples ) * 0.02679 - 9.2411;
     
     // If value is close to zero, then set to zero
     if (_Pressure < 2.0) _Pressure = 0.0;

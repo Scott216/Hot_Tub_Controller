@@ -25,7 +25,7 @@ enum needHeatStatus_t { DONT_NEED_HEAT, PRE_HEAT_CHECK, NEED_HEAT };
 needHeatStatus_t needHeatStatus = DONT_NEED_HEAT; 
 
 // Alarm setpoints
-#define ALARM_HEATER_AMPS_HIGH   30  // Max heater amps allowed
+#define ALARM_HEATER_AMPS_HIGH   40  // Max heater amps allowed
 #define PUMP_AMPS_THRESHOLD       2  // Min amps needed verify pump is on
 #define PUMP_PRESSURE_THRESHOLD   5  // Min PSI needed to verify pump is running
 
@@ -54,7 +54,7 @@ void PrintPumpInfo();
 void setup()
 {
   Serial.begin(9600);
-
+  
   // Define output pins
   pinMode(PUMP_ON_OFF_OUTPUT_PIN,    OUTPUT);
   pinMode(HEATER_ON_OFF_OUTPUT_PIN,  OUTPUT);
@@ -83,6 +83,7 @@ void setup()
 //============================================================================
 void loop()
 {
+  
   // Setup timers
   const uint32_t PUMP_ON_DELAY =            5000;  // Delay before pump can be turned on again after being off
   const uint32_t ALARM_CHECK_INTERVAL =     5000;  // Check for alarm every 5 seconds
@@ -235,6 +236,8 @@ void updateDisplay()
   display.println(dispTxt);
   display.setCursor(0,19);
   sprintf(dispTxt, "P %d, Htr %d",  (int)hotTubControl.getPressure(), digitalRead(HEATER_ON_OFF_OUTPUT_PIN)); 
+  
+  
   display.println(dispTxt);  
   display.display();
 
