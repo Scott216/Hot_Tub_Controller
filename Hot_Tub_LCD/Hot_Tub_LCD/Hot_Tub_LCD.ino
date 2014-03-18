@@ -311,14 +311,14 @@ void EncoderSetup()
   pinMode(encoderPinA, INPUT);
   pinMode(encoderPinB, INPUT);
   
-  // turn on pullup resistors
+  // Turn on pullup resistors
   digitalWrite(encoderPinA, HIGH);
   digitalWrite(encoderPinB, HIGH);
   
-  // encoder pin on interrupt 0 (pin 2)
+  // Encoder pin on interrupt 0 (pin 2)
   attachInterrupt(interruptA, doEncoderA, CHANGE);
   
-  // encoder pin on interrupt 1 (pin 3)
+  // Encoder pin on interrupt 1 (pin 3)
   attachInterrupt(interruptB, doEncoderB, CHANGE);
   
 } // EncoderSetup()
@@ -390,7 +390,7 @@ void doEncoderA()
     // and if 200mS since last encoder change has passed
     if ( A_set && !B_set && (long)(millis() - encoderChangeTime) > 200 )
     { 
-      encoderTemp = encoderTemp + 0.25;
+      encoderTemp = encoderTemp + 0.5;
       encoderChangeTime = millis(); // record time encoder value changed
     }
     rotating = false;  // no more debouncing until loop() hits again
