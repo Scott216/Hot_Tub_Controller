@@ -44,8 +44,12 @@ From Main board to user panel
  heater on/off status
  water temperature
 
+ Change Log
+ 09/23/14 v2.00 - Added version
+ 
 */
 
+#define VERSION "v2.00"
 
 // === Libraries ===
 #include <Arduino.h>
@@ -146,7 +150,8 @@ void setup()
   encoderTemp = hottub.getWaterTempDefault();                
   oldEncoderTemp = hottub.getWaterTempDefault();              
   
-  Serial.println("Hot tub panel setup()");
+  Serial.print("Hot tub panel setup ");
+  Serial.println(VERSION);
 } // setup()
 
 
