@@ -149,6 +149,7 @@ void HotTubControl::readTemperature()
 
 // Read pressure gauge
 // Average 25 samples
+// Sensor outputs 4-20mA across 165 ohm resistor
 void HotTubControl::readPressure()
 {
     float pressure = 0.0;
@@ -160,11 +161,15 @@ void HotTubControl::readPressure()
         delay(1);
     }
     
-    // Calculate averages from samples
-    _Pressure = ( pressure / (float) samples ) * 0.02679 - 9.2411;
+    // Calculate average pressure from samples
+    _Pressure = ( pressure / (float) samples ) * 0.0381 - 9.4848;
     
+    // If pressure is less then -5 PSI, then sensor is bad
+    if (_Pressure < -5.0 )
+    { _Pressure = -1.0; } // bad sensor
     // If value is close to zero, then set to zero
-    if (_Pressure < 2.0) _Pressure = 0.0;
+    else if (_Pressure < 2.0) 
+    { _Pressure = 0.0; } // Close to zero, just set to zero
     
 } // readPressure()
 

@@ -4,31 +4,39 @@ try different encoder code
 Can pushbuttons be in interrupts - yes
 Have an alarm condition shut down Hot Tub
 Put turning heater, pump and bubbler functions in class, currently it's done with digitalWrite in the ino file
+Use momentary pushbuttons instead of rotary encoder to change temp
+Make delay longer when pump comes on to check temperature.  Too much cycling could be bad for it.
 
 Change Log
 09/23/14  v2.00 - Added change log and version
 12/03/14  v2.01 - took out old Mega code
 12/09/14  v2.02 - Added HardwareSerial.h so it would compile in IDE v1.5.8
+12/09/14  v2.03 - Added RTC code - clock not used for anything yet, removed heat on/off from OLED (have indicator now)
+                  Changed formula for pressure.  Added test and alarm for bad pressure sensor
 
 */
 
-#define VERSION "v2.02" 
+#define VERSION "v2.03" 
 
 // === Libraries ===
-#include "Arduino.h"
-#include "HardwareSerial.h"    // Required by IDE 1.5.x
+#include <HardwareSerial.h>    // Required by IDE 1.5.x
 #include <OneWire.h>           // http://www.pjrc.com/teensy/td_libs_OneWire.html  http://playground.arduino.cc/Learning/OneWire
 #include <DallasTemperature.h> // http://milesburton.com/index.php?title=Dallas_Temperature_Control_Library
 #include <I2C.h>               // use for I2C communication  http://dsscircuits.com/articles/arduino-i2c-master-library.html
 #include <SSD1306_I2C_DSS.h>   // Library for OLED display http://github.com/Scott216/SSD1306_I2C_DSS
 #include <Adafruit_GFX.h>      // Library for OLED display http://github.com/adafruit/Adafruit-GFX-Library
+#include <RTClib_DSSI2C.h>  // http://github.com/Scott216/RTCLib_wo_wire
+
 #include "Hot_Tub_MainLibrary.h"
 
 
-// Create HotTubController instance
+// Instantiate Hot Tub object
 HotTubControl hotTubControl;
 
-// Values for NeedHestStatus
+// Instantiate Real Time Clock object
+RTC_DS1307 RTC;
+
+// Values for NeedHeatStatus
 enum needHeatStatus_t { DONT_NEED_HEAT, PRE_HEAT_CHECK, NEED_HEAT };
 needHeatStatus_t needHeatStatus = DONT_NEED_HEAT; 
 
@@ -38,6 +46,8 @@ needHeatStatus_t needHeatStatus = DONT_NEED_HEAT;
 #define PUMP_PRESSURE_THRESHOLD   5  // Min PSI needed to verify pump is running
 
 #define I2C_TIMEOUT 20000
+
+// Instantiate OLED object
 Adafruit_SSD1306 display(OLED_RESET, I2C_TIMEOUT);
 
 
@@ -71,7 +81,26 @@ void setup()
   // initialize hotTubControl 
   hotTubControl.begin();
   
-
+  // Initialize Real Time Clock
+  char timestamp[25];  
+  RTC.begin();
+  if ( RTC.isrunning() )
+  {
+    // following line sets the RTC to the date & time this sketch was compiled
+    // To initially set the clock, uncomment the line below.  Compile and upload.  Then comment the
+    // line out and upload again.
+    // RTC.adjust(DateTime(__DATE__, __TIME__));
+    
+    // Put the date and time in a character array
+    DateTime now = RTC.now();  // Gets the current time
+    sprintf(timestamp, "%02d/%02d/%d %02d:%02d:%02d", now.month(), now.day(), now.year(), now.hour(), now.minute(), now.second());
+  }
+  else
+  { 
+    Serial.println(F("RTC is NOT running!")); 
+    strcpy(timestamp, "No RTC"); 
+  }
+  
   // Initialize OLED display
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 128x32)
   display.setRotation(2);  // Orientation 0 = right side up, 2 = upside down
@@ -79,14 +108,19 @@ void setup()
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(0,8);
-  display.println(F("Finished setup"));
+  display.print(F("Hot Tub "));
   display.println(VERSION);
+  display.println(timestamp);
   display.display();
 
   Serial.print(F("Finished Hot Tub Main Setup, "));
   Serial.println(VERSION);
+  Serial.print(F("RTC Time: ")); 
+  Serial.println(timestamp);
   
-} // setup()
+  delay(2500);  // delay so you can read display
+  
+} // end setup()
 
 
 //============================================================================
@@ -150,7 +184,7 @@ void loop()
     lastAlarmCheck = millis();
   }
 
-  PrintStatus();  // srg Print for debugging
+  // PrintStatus();  // use for debugging
 
   // Turn off pump
   bool coolDownTimerExpired = (long)(millis() - heater_cooldown_timer) > 0;  // runs water past heater after heater is off so it will cool down
@@ -207,7 +241,7 @@ void loop()
                                   digitalRead(BUBBLER_ON_OFF_OUTPUT_PIN),
                                   digitalRead(HEATER_ON_OFF_OUTPUT_PIN) );
 
-}  // loop()
+}  // end loop()
 
 
 //============================================================================
@@ -245,13 +279,12 @@ void updateDisplay()
   display.setCursor(0,9);
   display.println(dispTxt);
   display.setCursor(0,19);
-  sprintf(dispTxt, "P %d, Htr %d",  (int)hotTubControl.getPressure(), digitalRead(HEATER_ON_OFF_OUTPUT_PIN)); 
-  
-  
+  sprintf(dispTxt, "Pres %d",  (int)hotTubControl.getPressure() ); 
   display.println(dispTxt);  
   display.display();
 
 }  // end updateDisplay()
+
 
 //============================================================================
 /*
@@ -308,6 +341,14 @@ bool CheckAlarms()
   if ( hotTubControl.getPressure() > 20.0 )
   {
     sprintf_P(txtAlarm, PSTR("High pressure alarm, pressure = %d PSI"), (int) hotTubControl.getPressure() );
+    isAlarm = true;
+    OutputAlarm(txtAlarm);
+  }
+  
+  // Bad pressure sensor
+  if ( hotTubControl.getPressure() == -1.0 )
+  {
+    strcpy(txtAlarm, "Bad pressure sensor" );
     isAlarm = true;
     OutputAlarm(txtAlarm);
   }
@@ -369,17 +410,18 @@ void OutputAlarm(char AlarmText[])
   display.println(AlarmText);
   display.display();
 */
-} // OutputAlarm()
+} // end OutputAlarm()
 
-
-
+// Use for debugging
 void PrintStatus()
 { 
 //  PrintPumpInfo();
+//  printHeaterInfo();
   PrintStatusAll();
-} // PrintStatus()
+} // end PrintStatus()
 
 
+// Use for debugging
 void printHeaterInfo()
 {
   static int8_t   cntHeading;  // prints new heading every 20 rows
@@ -406,9 +448,10 @@ void printHeaterInfo()
     Serial.println();  
   }
   
-}  // printHeaterInfo()
+}  // end printHeaterInfo()
 
 
+// Use for debugging
 void PrintPumpInfo()
 {
 
@@ -436,11 +479,10 @@ void PrintPumpInfo()
     
     Serial.println();  
   }
-} // PrintPumpInfo()
+} // end PrintPumpInfo()
 
 
-//============================================================================
-//============================================================================
+// Use for debugging
 void PrintStatusAll()
 {
   static int8_t   cntHeading;  // prints new heading every 20 rows
@@ -495,7 +537,7 @@ void PrintStatusAll()
 
     Serial.println("");
   }
-}  // PrintStatusAll()
+}  // end PrintStatusAll()
 
 
 
