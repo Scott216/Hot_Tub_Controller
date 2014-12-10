@@ -5,10 +5,18 @@ Can pushbuttons be in interrupts - yes
 Have an alarm condition shut down Hot Tub
 Put turning heater, pump and bubbler functions in class, currently it's done with digitalWrite in the ino file
 
+Change Log
+09/23/14  v2.00 - Added change log and version
+12/03/14  v2.01 - took out old Mega code
+12/09/14  v2.02 - Added HardwareSerial.h so it would compile in IDE v1.5.8
+
 */
+
+#define VERSION "v2.02" 
 
 // === Libraries ===
 #include "Arduino.h"
+#include "HardwareSerial.h"    // Required by IDE 1.5.x
 #include <OneWire.h>           // http://www.pjrc.com/teensy/td_libs_OneWire.html  http://playground.arduino.cc/Learning/OneWire
 #include <DallasTemperature.h> // http://milesburton.com/index.php?title=Dallas_Temperature_Control_Library
 #include <I2C.h>               // use for I2C communication  http://dsscircuits.com/articles/arduino-i2c-master-library.html
@@ -71,10 +79,12 @@ void setup()
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(0,8);
-  display.println(F("Finished setup()"));
+  display.println(F("Finished setup"));
+  display.println(VERSION);
   display.display();
 
-  Serial.println(F("Finished Hot Tub Main Setup()"));
+  Serial.print(F("Finished Hot Tub Main Setup, "));
+  Serial.println(VERSION);
   
 } // setup()
 

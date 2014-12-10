@@ -11,34 +11,8 @@ const int SLAVE_ID =     46; // I2C address of LED backpack on user panel
 const int I2C_SUCCESS =   0; // When I2C read/writes are sucessful, function returns 0
 const int MAX_I2C_BYTES = 6; // Max I2C bytes to send data to slave
 
-
-// #define MEGA  // set this if using an Arduino Mega
-#define PANSTAMP // set this if using Panstamp
-//#define TESTMODE // If not connected to controller, remove comment and this will create dummy sensor data
-
 // Define I/0 Pins
-#ifdef MEGA
-//=== Analog Inputs for CTs measuring current ===
-#define CT_PUMP       8  // Pump amps input 20 Amp CT
-#define CT_HEATER    10  // Heater leg 1 amps, 50 Amp CT
-#define CT_BUBBLER   11  // Bubbler amps, 20 Amp CT
-
-//===Analog Inputs from Pressure===
-#define PRESSURE_GAUGE 12  // Pressure, comes from 4-20mA gauge
-
-//=== Output pins for motor relays ===
-#define PUMP_ON_OFF_OUTPUT_PIN     11
-#define HEATER_ON_OFF_OUTPUT_PIN    9
-#define BUBBLER_ON_OFF_OUTPUT_PIN   8
-
-#define ONE_WIRE_BUS 37 // OneWire data pin
-#define OLED_RESET 4
-
-#endif
-
-#ifdef PANSTAMP
 // I/O used: Analog: 0,1,2,3,6   Digital: 3,4,5,6,7 
-
 //=== Analog Inputs for CTs measuring current ===
 #define CT_PUMP       0  // Pump amps input 20 Amp CT
 #define CT_HEATER     1  // Heater amps, 50 Amp CT
@@ -48,14 +22,13 @@ const int MAX_I2C_BYTES = 6; // Max I2C bytes to send data to slave
 #define PRESSURE_GAUGE 6  // Pressure, comes from 4-20mA gauge
 
 //=== Output pins for motor relays ===
+#define AUX_OUTPUT_PIN              8
 #define PUMP_ON_OFF_OUTPUT_PIN      7
 #define HEATER_ON_OFF_OUTPUT_PIN    6
 #define BUBBLER_ON_OFF_OUTPUT_PIN   5
 
 #define ONE_WIRE_BUS 3 // OneWire data pin
 #define OLED_RESET 4
-
-#endif
 
 
 // I2C Commands to read data from LED backpack user panel
