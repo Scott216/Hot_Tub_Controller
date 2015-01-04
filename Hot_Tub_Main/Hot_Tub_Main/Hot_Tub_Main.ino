@@ -5,7 +5,14 @@ Can pushbuttons be in interrupts - yes
 Have an alarm condition shut down Hot Tub
 Put turning heater, pump and bubbler functions in class, currently it's done with digitalWrite in the ino file
 Use momentary pushbuttons instead of rotary encoder to change temp
-Make delay longer when pump comes on to check temperature.  Too much cycling could be bad for it.
+Check CT circuits - ADC value seems low.  For 50 amp CT at 22.8 amps, ADC is 390.  It should be about 466
+
+
+
+Typical amps:
+Heater: 22
+Pump: 11
+Air bubbler: 
 
 Change Log
 09/23/14  v2.00 - Added change log and version
@@ -13,10 +20,13 @@ Change Log
 12/09/14  v2.02 - Added HardwareSerial.h so it would compile in IDE v1.5.8
 12/09/14  v2.03 - Added RTC code - clock not used for anything yet, removed heat on/off from OLED (have indicator now)
                   Changed formula for pressure.  Added test and alarm for bad pressure sensor
+12/13/14  v2.04 - Added delay so hot tub pump doesn't cycle too frequently - still needs work, though
+12/19/14  v2.05 - Added define PROGMEM.  Changed isPumpBtnOn() to isJetsBtnOn.  Made pump delay 5 minutes, but jets push-button will over-ride.  
+                  Changed amps calculation formula from CTs
 
 */
 
-#define VERSION "v2.03" 
+#define VERSION "v2.05"
 
 // === Libraries ===
 #include <HardwareSerial.h>    // Required by IDE 1.5.x
@@ -25,10 +35,13 @@ Change Log
 #include <I2C.h>               // use for I2C communication  http://dsscircuits.com/articles/arduino-i2c-master-library.html
 #include <SSD1306_I2C_DSS.h>   // Library for OLED display http://github.com/Scott216/SSD1306_I2C_DSS
 #include <Adafruit_GFX.h>      // Library for OLED display http://github.com/adafruit/Adafruit-GFX-Library
-#include <RTClib_DSSI2C.h>  // http://github.com/Scott216/RTCLib_wo_wire
+#include <RTClib_DSSI2C.h>     // http://github.com/Scott216/RTCLib_wo_wire
 
 #include "Hot_Tub_MainLibrary.h"
 
+// This gets rid of compiler warning: Only initialized variables can be placed into program memory area
+#undef PROGMEM
+#define PROGMEM __attribute__(( section(".progmem.data") ))
 
 // Instantiate Hot Tub object
 HotTubControl hotTubControl;
@@ -72,6 +85,7 @@ void PrintPumpInfo();
 void setup()
 {
   Serial.begin(9600);
+  delay(3000);  
   
   // Define output pins
   pinMode(PUMP_ON_OFF_OUTPUT_PIN,    OUTPUT);
@@ -129,7 +143,7 @@ void loop()
 {
   
   // Setup timers
-  const uint32_t PUMP_ON_DELAY =            5000;  // Delay before pump can be turned on again after being off
+  const uint32_t PUMP_ON_DELAY =          600000;  // Delay before pump can be turned on again after being off
   const uint32_t ALARM_CHECK_INTERVAL =     5000;  // Check for alarm every 5 seconds
   const uint32_t SENSOR_CHECK_INTERVAL =    1000;  // Check sensor every second
   const uint32_t BUBBLER_ON_DELAY =          700;  // Delay before bubbler can be turned on again after being off
@@ -184,20 +198,24 @@ void loop()
     lastAlarmCheck = millis();
   }
 
-  // PrintStatus();  // use for debugging
+  PrintStatus();  // use for debugging
 
   // Turn off pump
   bool coolDownTimerExpired = (long)(millis() - heater_cooldown_timer) > 0;  // runs water past heater after heater is off so it will cool down
   if ( coolDownTimerExpired )
   {
-    if ( !hotTubControl.isHotTubBtnOn() || ( !hotTubControl.isPumpBtnOn() && needHeatStatus == DONT_NEED_HEAT ) )
+    if ( !hotTubControl.isHotTubBtnOn() || ( !hotTubControl.isJetsBtnOn() && needHeatStatus == DONT_NEED_HEAT ) )
     { digitalWrite(PUMP_ON_OFF_OUTPUT_PIN, LOW); }
   }
   
   // Turn on pump
+  // PUMP_ON_DELAY prevents the pump from cycling too frequently as the temperature drops and it call for heat.  What happens a lot is the temp on the
+  // sensor drops and the pump comes on, but when warm water from the hot tub hits the sensor, the program sees it doesn't need heat and the pump is
+  // turned off. The problem is this can happen several times per minute, causing a lot of pump cycling.  The delay forces the pump to wait, even if the
+  // temperature across the sensor is low.  But if the Jets pushbutton is pressed, it will bypass thsi delay and just turn on the pump
   bool pumpOnDelayTimerExpired = (long)(millis() - lastPumpOnTime) > PUMP_ON_DELAY;  // Timer used to prevent pump from cycling too quickly
-  bool needPump = hotTubControl.isPumpBtnOn() || needHeatStatus != DONT_NEED_HEAT; // Either button or heater needs pump turned on
-  if( hotTubControl.isHotTubBtnOn() && needPump && pumpOnDelayTimerExpired )
+  bool needPump = hotTubControl.isJetsBtnOn() || needHeatStatus != DONT_NEED_HEAT;   // Either button or heater needs pump turned on
+  if( hotTubControl.isHotTubBtnOn() && needPump && ( pumpOnDelayTimerExpired  || hotTubControl.isJetsBtnOn() ) )
   {
     digitalWrite(PUMP_ON_OFF_OUTPUT_PIN, HIGH);
     lastPumpOnTime = millis();
@@ -465,14 +483,14 @@ void PrintPumpInfo()
     //Print Pushbutton state and Led indicator state
     if(cntHeading > 30 || millis() < 1000)
     {
-      Serial.println(F("PumpPn\tisPumpBtnOn()\tneedheat"));
+      Serial.println(F("PumpPn\tisJetsBtnOn()\tneedheat"));
       cntHeading = 0;
     }
     cntHeading++;
    
     Serial.print(digitalRead(PUMP_ON_OFF_OUTPUT_PIN));
     Serial.print("\t\t");
-    Serial.print(hotTubControl.isPumpBtnOn());
+    Serial.print(hotTubControl.isJetsBtnOn());
     Serial.print("\t");
     Serial.print(needHeatStatus);
    
@@ -503,7 +521,7 @@ void PrintStatusAll()
     Serial.print(hotTubControl.isHotTubBtnOn());
     Serial.print("\t");
     
-    Serial.print(hotTubControl.isPumpBtnOn());
+    Serial.print(hotTubControl.isJetsBtnOn());
     Serial.print(digitalRead(PUMP_ON_OFF_OUTPUT_PIN));
     Serial.print(F("\t"));
     
