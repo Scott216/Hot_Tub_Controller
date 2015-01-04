@@ -71,7 +71,7 @@ public:
   void writePanelStatus(float currentTemp, bool pumpState, bool bubbleState, bool heatState); // Send update to panel
   void refreshSensors();   // Read temp, pressure, amp sensors
   bool isHotTubBtnOn();    // Returns state of On/Off button on control panel
-  bool isPumpBtnOn();      // Returns state of Pump button on control panel
+  bool isJetsBtnOn();      // Returns state of Pump button on control panel
   bool isBubbleBtnOn();    // Returns state of Bubble button on control panel
   byte getTempSetpoint();  // Returns the setpoint temp
   float getTempPreHeat();  // Returns Pre-heater temperature

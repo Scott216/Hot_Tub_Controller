@@ -111,9 +111,9 @@ void HotTubControl::refreshSensors()
 void HotTubControl::readTemperature()
 {
     
-    float validTemp;
-    float PreHeaterTemp1;
-    float PreHeaterTemp2;
+    float validTemp =      0;
+    float PreHeaterTemp1 = 0;
+    float PreHeaterTemp2 = 0;
     
     // Refresh temperatures
     oneWireBus.requestTemperatures();
@@ -188,6 +188,7 @@ void HotTubControl::readAmps()
     for (samples = 0; samples < 25; samples++)
     {
         // Get Amps from CTs
+        // Heater is typically 22 amps, pump is 11 amps
         pump_amps    += analogRead(CT_PUMP);    // ADC value for pump is about 630
         heater_amps  += analogRead(CT_HEATER);  // Should read about 22.8 amps
         bubbler_amps += analogRead(CT_BUBBLER);
@@ -195,9 +196,9 @@ void HotTubControl::readAmps()
     }
     
     // Calculate averages from samples
-    _ampsPump =    (pump_amps    / (float) samples) * (20.0 / 1024.0) - 1.3;    // 20 Amp CT,  -1.30 amps calibration offset
-    _ampsHeater =  (heater_amps  / (float) samples) * (50.0 / 1024.0) - 4.75;   // 50 Amp CTs, -4.75 amps calibration offset
-    _ampsBubbler = (bubbler_amps / (float) samples) * (20.0 / 1024.0) - 1.0;    // 20 Amp CTs, -1.00 amps calibration offset
+    _ampsPump =    (pump_amps    / (float) samples) / 41.455;   // 20 Amp CT, 11 amps = 445 ADC
+    _ampsHeater =  (heater_amps  / (float) samples) / 17.100;   // 50 Amp CTs.  22.8 amps = ~ 390 ADC
+    _ampsBubbler = (bubbler_amps / (float) samples) / 38.830;   // 20 Amp CTs, 5.64 = 218 ADC
     // If values are close to zero, then set to zero
     if (_ampsPump    < 1.0) _ampsPump =    0.0;
     if (_ampsHeater  < 1.0) _ampsHeater =  0.0;
@@ -240,7 +241,7 @@ bool HotTubControl::isHotTubBtnOn()
 
 
 // Returns state of pump pushbutton on control panel
-bool HotTubControl::isPumpBtnOn()
+bool HotTubControl::isJetsBtnOn()
 { return _pumpBtn; }
 
 
