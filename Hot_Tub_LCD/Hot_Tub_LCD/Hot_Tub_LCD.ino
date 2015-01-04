@@ -46,10 +46,11 @@ From Main board to user panel
 
  Change Log
  09/23/14 v2.00 - Added version
+ 12/18/14 v2.01 - Used strcpy() to get rid of warning: "deprecated conversion from string to char"
  
 */
 
-#define VERSION "v2.00"
+#define VERSION "v2.01"
 
 // === Libraries ===
 #include <Arduino.h>
@@ -81,7 +82,7 @@ From Main board to user panel
 
 ST7565 glcd( LCD_SID, LCD_SCLK, LCD_A0, LCD_RST, LCD_CS);   // create LCD object
 const uint8_t CONTRAST = 0x18; 
-const uint32_t MINUTE = 60000UL;
+const int32_t MINUTE = 60000;
 
 // Set Max and Min water temp settings with encoder
 const int WATER_TEMP_MAX = 105;
@@ -91,16 +92,16 @@ const int WATER_TEMP_MIN  = 70;
 // Encoder setup
 enum PinAssignments
 {
-  encoderPinA = ENCODERA,   // right
-  encoderPinB = ENCODERB,   // left
-  interruptA  = 0,   // Interrupt number (not pin #) for encoderPinA
-  interruptB  = 1    // Interrupt number for encoderPinB
+  encoderPinA = ENCODERA,     // right
+  encoderPinB = ENCODERB,     // left
+  interruptA  = 0,            // Interrupt number (not pin #) for encoderPinA
+  interruptB  = 1             // Interrupt number for encoderPinB
 };
 
-volatile float encoderTemp;  // counter for the dial  http://arduino.cc/en/Reference/Volatile
-float oldEncoderTemp;        // change management
-boolean rotating = false;           // debounce management
-uint32_t encoderChangeTime;         // timestamp encoder value was last changed
+volatile float encoderTemp;   // counter for the dial  http://arduino.cc/en/Reference/Volatile
+float oldEncoderTemp;         // change management
+boolean rotating = false;     // debounce management
+uint32_t encoderChangeTime;   // timestamp encoder value was last changed
 
 // interrupt service routine variables
 boolean A_set = false;
@@ -166,11 +167,11 @@ void loop()
   }
   
   // Turn bubbles off after 15 minutes
-  if( (long)( millis() - hottub.getBubblerOnTime() ) > 15UL * MINUTE ) 
+  if( (long)( millis() - hottub.getBubblerOnTime() ) > 15L * MINUTE )
   { hottub.setBubblerBtnOff(); }
   
   // Turn pump off after 30 minutes
-  if( (long)(millis() - hottub.getPumpOnTime() ) > 30UL * MINUTE) 
+  if( (long)(millis() - hottub.getPumpOnTime() ) > 30L * MINUTE)
   { hottub.setPumpBtnOff(); }
   
   // Update pushbutton LEDs
@@ -184,9 +185,15 @@ void loop()
   // update LCD display
   char LCDMsg[25];
   if ( isNewTempSetpoint == true )
-  { UpdateDisplay(hottub.getWaterTempSetpoint(), "New Setpoint" ); }  // Display new temperature setpoint
+  {
+    strcpy(LCDMsg, "New Setpoint");
+    UpdateDisplay(hottub.getWaterTempSetpoint(), LCDMsg );  // Display new temperature setpoint
+  }
   else if ( hottub.isHotTubBtnOn() == false )
-  { UpdateDisplay(hottub.getWaterTemp(), "HOT TUB IS OFF" );  }  // hot tub is off, send actual water temperature to display, but don't display setpoint
+  {
+    strcpy(LCDMsg, "HOT TUB IS OFF");
+    UpdateDisplay(hottub.getWaterTemp(), LCDMsg );        // hot tub is off, send actual water temperature to display, but don't display setpoint
+  }
   else
   {
     // Hot tub is on, send actual water temperature to display
@@ -272,12 +279,22 @@ void UpdateDisplay(uint8_t temperature, char statusMsg[] )
     glcd.drawbitmap(w+w+x-8, y, &bigDigits[digit3][0], w, h, BLACK);
     
       // Display status of heater, bubbler and jets
+    char dispTxt[7];
     if( new_Bubbler == true )
-    { glcd.drawstring(3, 0, "Bubble"); }
+    {
+      strcpy(dispTxt, "Bubble");
+      glcd.drawstring(3, 0, dispTxt);
+    }
     if( new_Heater == true )
-    { glcd.drawstring(57, 0, "Heat"); }
+    {
+      strcpy(dispTxt, "Heat");
+      glcd.drawstring(57, 0, dispTxt);
+    }
     if( new_Pump == true )
-    { glcd.drawstring(100, 0, "Jets"); }
+    {
+      strcpy(dispTxt, "Jets");
+      glcd.drawstring(100, 0, dispTxt);
+    }
 
     // display status message at bottom of screen
     int leftPos = (128 - strlen(statusMsg) * 6) / 2;
