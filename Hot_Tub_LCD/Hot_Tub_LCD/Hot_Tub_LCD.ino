@@ -58,6 +58,10 @@ From Main board to user panel
 #include <Wire.h>
 #include "Hot_Tub_LCD_Library.h"  // local library
 
+// This gets rid of compiler warning: Only initialized variables can be placed into program memory area
+#undef PROGMEM
+#define PROGMEM __attribute__(( section(".progmem.data") ))
+
 //=== Output for LEDs in pushbuttons ===
 #define HOTTUB_ON_OFF_INDICATOR_OUTPUT_PIN   A0
 #define PUMP_INDICATOR_OUTPUT_PIN            A1
